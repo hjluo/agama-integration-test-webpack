@@ -50,6 +50,7 @@ const confirm_installation_page_1 = __webpack_require__(/*! ../pages/confirm_ins
 const congratulation_page_1 = __webpack_require__(/*! ../pages/congratulation_page */ "./src/pages/congratulation_page.ts");
 const overview_page_1 = __webpack_require__(/*! ../pages/overview_page */ "./src/pages/overview_page.ts");
 const sidebar_page_1 = __webpack_require__(/*! ../pages/sidebar_page */ "./src/pages/sidebar_page.ts");
+const installing_page_1 = __webpack_require__(/*! ../pages/installing_page */ "./src/pages/installing_page.ts");
 function performInstallation() {
     (0, helpers_1.it)("should start installation", async function () {
         const confirmInstallation = new confirm_installation_page_1.ConfirmInstallationPage(helpers_1.page);
@@ -60,9 +61,14 @@ function performInstallation() {
         await overview.install();
         await confirmInstallation.continue();
     });
+    (0, helpers_1.it)("should in installing", async function () {
+        const installing = new installing_page_1.InstallingPage(helpers_1.page);
+        await installing.waitInstallBegin();
+        await installing.waitForInstalling();
+    });
     (0, helpers_1.it)("should finish installation", async function () {
-        await new congratulation_page_1.CongratulationPage(helpers_1.page).wait(14 * 60 * 1000);
-    }, 15 * 60 * 1000);
+        await new congratulation_page_1.CongratulationPage(helpers_1.page).wait(2000);
+    });
 }
 function finishInstallation() {
     (0, helpers_1.it)("should finish", async function () {
@@ -541,6 +547,33 @@ class EncryptionSettingsPage {
     }
 }
 exports.EncryptionSettingsPage = EncryptionSettingsPage;
+
+
+/***/ }),
+
+/***/ "./src/pages/installing_page.ts":
+/*!**************************************!*\
+  !*** ./src/pages/installing_page.ts ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.InstallingPage = void 0;
+class InstallingPage {
+    page;
+    constructor(page) {
+        this.page = page;
+    }
+    async waitInstallBegin() {
+        await this.page.waitForSelector("svg.pf-v6-c-spinner.pf-m-xl");
+    }
+    async waitForInstalling() {
+        await this.page.waitForSelector("svg.pf-v6-c-spinner.pf-m-xl", { hidden: true });
+    }
+}
+exports.InstallingPage = InstallingPage;
 
 
 /***/ }),
