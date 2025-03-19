@@ -58,6 +58,7 @@ function performInstallation() {
         const overview = new overview_page_1.OverviewPage(helpers_1.page);
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
         await sidebar.goToOverview();
+        await overview.takeScreenshot();
         await overview.install();
         await confirmInstallation.continue();
     });
@@ -345,6 +346,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.commaSeparatedList = commaSeparatedList;
 exports.parse = parse;
 const commander_1 = __webpack_require__(/*! commander */ "./node_modules/commander/index.js");
 const commander = __importStar(__webpack_require__(/*! commander */ "./node_modules/commander/index.js"));
@@ -357,6 +359,9 @@ function getInt(value) {
         throw new commander.InvalidArgumentError("Enter a valid number.");
     }
     return parsed;
+}
+function commaSeparatedList(value) {
+    return value.split(',');
 }
 /**
  * Parse command line options. When an invalid command line option is used the script aborts.
@@ -807,12 +812,14 @@ exports.LoginAsRootPage = LoginAsRootPage;
 /*!************************************!*\
   !*** ./src/pages/overview_page.ts ***!
   \************************************/
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OverviewPage = void 0;
+const fs_1 = __webpack_require__(/*! fs */ "fs");
+const path_1 = __webpack_require__(/*! path */ "path");
 class OverviewPage {
     page;
     installButton = () => this.page.locator("button::-p-text(Install)");
@@ -825,6 +832,22 @@ class OverviewPage {
     }
     async install() {
         await this.installButton().click();
+    }
+    async ensureDirectoryExistence(dirPath) {
+        const resolvedPath = (0, path_1.resolve)(dirPath);
+        if (!(0, fs_1.existsSync)(resolvedPath)) {
+            (0, fs_1.mkdirSync)(resolvedPath, { recursive: true });
+            console.log(`Directory created: ${resolvedPath}`);
+        }
+        else {
+            console.log(`Directory already exists: ${resolvedPath}`);
+        }
+    }
+    async takeScreenshot() {
+        const screenshotBuffer = await this.page.screenshot();
+        this.ensureDirectoryExistence("/run/agama/scripts");
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", "overview_page_screenshot.png");
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
     }
 }
 exports.OverviewPage = OverviewPage;

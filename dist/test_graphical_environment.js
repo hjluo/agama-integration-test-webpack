@@ -24,6 +24,7 @@ function performInstallation() {
         const overview = new overview_page_1.OverviewPage(helpers_1.page);
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
         await sidebar.goToOverview();
+        await overview.takeScreenshot();
         await overview.install();
         await confirmInstallation.continue();
     });
@@ -81,6 +82,7 @@ function logIn(password) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.selectSinglePattern = selectSinglePattern;
+exports.selectPatterns = selectPatterns;
 const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
 const sidebar_page_1 = __webpack_require__(/*! ../pages/sidebar_page */ "./src/pages/sidebar_page.ts");
 const software_page_1 = __webpack_require__(/*! ../pages/software_page */ "./src/pages/software_page.ts");
@@ -93,6 +95,21 @@ function selectSinglePattern(pattern) {
         await sidebar.goToSoftware();
         await software.changeSelection();
         await softwareSelection.selectPattern(pattern);
+        await softwareSelection.close();
+    });
+}
+function selectPatterns(patterns) {
+    (0, helpers_1.it)(`should select patterns ${patterns.join(", ")}`, async function () {
+        const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
+        const software = new software_page_1.SoftwarePage(helpers_1.page);
+        const softwareSelection = new software_selection_page_1.SoftwareSelectionPage(helpers_1.page);
+        await sidebar.goToSoftware();
+        await software.changeSelection();
+        await softwareSelection.takeFullScreenshot();
+        for (const pattern of patterns) {
+            await softwareSelection.selectPattern(pattern);
+            await softwareSelection.takeScreenshot(pattern);
+        }
         await softwareSelection.close();
     });
 }
@@ -142,6 +159,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.commaSeparatedList = commaSeparatedList;
 exports.parse = parse;
 const commander_1 = __webpack_require__(/*! commander */ "./node_modules/commander/index.js");
 const commander = __importStar(__webpack_require__(/*! commander */ "./node_modules/commander/index.js"));
@@ -154,6 +172,9 @@ function getInt(value) {
         throw new commander.InvalidArgumentError("Enter a valid number.");
     }
     return parsed;
+}
+function commaSeparatedList(value) {
+    return value.split(',');
 }
 /**
  * Parse command line options. When an invalid command line option is used the script aborts.
@@ -505,12 +526,14 @@ exports.LoginAsRootPage = LoginAsRootPage;
 /*!************************************!*\
   !*** ./src/pages/overview_page.ts ***!
   \************************************/
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OverviewPage = void 0;
+const fs_1 = __webpack_require__(/*! fs */ "fs");
+const path_1 = __webpack_require__(/*! path */ "path");
 class OverviewPage {
     page;
     installButton = () => this.page.locator("button::-p-text(Install)");
@@ -523,6 +546,22 @@ class OverviewPage {
     }
     async install() {
         await this.installButton().click();
+    }
+    async ensureDirectoryExistence(dirPath) {
+        const resolvedPath = (0, path_1.resolve)(dirPath);
+        if (!(0, fs_1.existsSync)(resolvedPath)) {
+            (0, fs_1.mkdirSync)(resolvedPath, { recursive: true });
+            console.log(`Directory created: ${resolvedPath}`);
+        }
+        else {
+            console.log(`Directory already exists: ${resolvedPath}`);
+        }
+    }
+    async takeScreenshot() {
+        const screenshotBuffer = await this.page.screenshot();
+        this.ensureDirectoryExistence("/run/agama/scripts");
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", "overview_page_screenshot.png");
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
     }
 }
 exports.OverviewPage = OverviewPage;
@@ -619,21 +658,73 @@ exports.SoftwarePage = SoftwarePage;
 /*!**********************************************!*\
   !*** ./src/pages/software_selection_page.ts ***!
   \**********************************************/
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.SoftwareSelectionPage = void 0;
+const fs_1 = __webpack_require__(/*! fs */ "fs");
+const path_1 = __webpack_require__(/*! path */ "path");
 class SoftwareSelectionPage {
     page;
-    patternText = (pattern) => this.page.locator(`::-p-aria(Select ${pattern})`);
+    patternCheckbox = (pattern) => this.page.locator(`input[type=checkbox][rowid=${pattern}-title]`);
     closeButton = () => this.page.locator("::-p-text(Close)");
     constructor(page) {
         this.page = page;
     }
+    // SELinux was auto selected, click will unselect it.
+    async clickCheckboxIfNotChecked(locator) {
+        const checkbox = await this.page.$(locator);
+        const isChecked = await checkbox.evaluate((checkbox) => checkbox.checked);
+        if (!isChecked) {
+            await checkbox.click();
+        }
+        else {
+            console.log("This pattern was auto selected.");
+        }
+    }
+    async clickCheckboxIfNotChecked_old(locator) {
+        const isChecked = await this.page.evaluate((checkboxSelector) => {
+            const checkbox = document.querySelector(checkboxSelector);
+            return checkbox.checked;
+        }, locator);
+        if (!isChecked) {
+            await this.page.click(locator);
+        }
+        else {
+            console.log("This pattern was auto selected.");
+        }
+    }
     async selectPattern(pattern) {
-        await this.patternText(pattern).click();
+        const checkboxSelector = `input[type=checkbox][rowid=${pattern}-title]`;
+        const checkbox = await this.patternCheckbox(pattern).waitHandle();
+        await checkbox.scrollIntoView();
+        this.clickCheckboxIfNotChecked(checkboxSelector);
+        // Wait for the checkbox to be checked
+        await this.page.waitForSelector(`${checkboxSelector}:checked`);
+    }
+    async ensureDirectoryExistence(dirPath) {
+        const resolvedPath = (0, path_1.resolve)(dirPath);
+        if (!(0, fs_1.existsSync)(resolvedPath)) {
+            (0, fs_1.mkdirSync)(resolvedPath, { recursive: true });
+            console.log(`Directory created: ${resolvedPath}`);
+        }
+        else {
+            console.log(`Directory already exists: ${resolvedPath}`);
+        }
+    }
+    async takeScreenshot(pattern) {
+        const screenshotBuffer = await this.page.screenshot();
+        this.ensureDirectoryExistence("/run/agama/scripts");
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", `${pattern}_screenshot.png`);
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
+        console.log(`take screenshot for pattern: ${pattern}`);
+    }
+    async takeFullScreenshot() {
+        const screenshotBuffer = await this.page.screenshot({ fullPage: true });
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", "full_screenshot.png");
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
     }
     async close() {
         await this.closeButton().click();

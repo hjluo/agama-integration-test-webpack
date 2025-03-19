@@ -11,6 +11,7 @@ export function performInstallation() {
     const sidebar = new SidebarPage(page);
 
     await sidebar.goToOverview();
+    await overview.takeScreenshot();
     await overview.install();
     await confirmInstallation.continue();
   });

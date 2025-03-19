@@ -72,59 +72,45 @@ function logIn(password) {
 
 /***/ }),
 
-/***/ "./src/checks/storage_dasd.ts":
-/*!************************************!*\
-  !*** ./src/checks/storage_dasd.ts ***!
-  \************************************/
+/***/ "./src/checks/software_selection.ts":
+/*!******************************************!*\
+  !*** ./src/checks/software_selection.ts ***!
+  \******************************************/
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.prepareDasdStorage = prepareDasdStorage;
+exports.selectSinglePattern = selectSinglePattern;
+exports.selectPatterns = selectPatterns;
 const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
 const sidebar_page_1 = __webpack_require__(/*! ../pages/sidebar_page */ "./src/pages/sidebar_page.ts");
-const storage_page_1 = __webpack_require__(/*! ../pages/storage_page */ "./src/pages/storage_page.ts");
-const dasd_page_1 = __webpack_require__(/*! ../pages/dasd_page */ "./src/pages/dasd_page.ts");
-function prepareDasdStorage() {
-    (0, helpers_1.it)("should prepare DASD storage", async function () {
-        const storage = new storage_page_1.StoragePage(helpers_1.page);
-        const dasd = new dasd_page_1.DasdPage(helpers_1.page);
+const software_page_1 = __webpack_require__(/*! ../pages/software_page */ "./src/pages/software_page.ts");
+const software_selection_page_1 = __webpack_require__(/*! ../pages/software_selection_page */ "./src/pages/software_selection_page.ts");
+function selectSinglePattern(pattern) {
+    (0, helpers_1.it)(`should select pattern ${pattern}`, async function () {
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
-        await sidebar.goToStorage();
-        await storage.manageDasd();
-        await dasd.activateDevice();
-        await dasd.back();
-        // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-        await (0, helpers_1.sleep)(2000);
+        const software = new software_page_1.SoftwarePage(helpers_1.page);
+        const softwareSelection = new software_selection_page_1.SoftwareSelectionPage(helpers_1.page);
+        await sidebar.goToSoftware();
+        await software.changeSelection();
+        await softwareSelection.selectPattern(pattern);
+        await softwareSelection.close();
     });
 }
-
-
-/***/ }),
-
-/***/ "./src/checks/storage_select_installation_device.ts":
-/*!**********************************************************!*\
-  !*** ./src/checks/storage_select_installation_device.ts ***!
-  \**********************************************************/
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.changeInstallationDeviceToLvm = changeInstallationDeviceToLvm;
-const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
-const sidebar_page_1 = __webpack_require__(/*! ../pages/sidebar_page */ "./src/pages/sidebar_page.ts");
-const select_installation_device_page_1 = __webpack_require__(/*! ../pages/select_installation_device_page */ "./src/pages/select_installation_device_page.ts");
-const storage_page_1 = __webpack_require__(/*! ../pages/storage_page */ "./src/pages/storage_page.ts");
-function changeInstallationDeviceToLvm() {
-    (0, helpers_1.it)("should select installation device", async function () {
-        const storage = new storage_page_1.StoragePage(helpers_1.page);
-        const selectInstallationDevice = new select_installation_device_page_1.SelectInstallationDevicePage(helpers_1.page);
+function selectPatterns(patterns) {
+    (0, helpers_1.it)(`should select patterns ${patterns.join(", ")}`, async function () {
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
-        await sidebar.goToStorage();
-        await storage.changeInstallationDevice();
-        await selectInstallationDevice.installOnNewLvm();
+        const software = new software_page_1.SoftwarePage(helpers_1.page);
+        const softwareSelection = new software_selection_page_1.SoftwareSelectionPage(helpers_1.page);
+        await sidebar.goToSoftware();
+        await software.changeSelection();
+        await softwareSelection.takeFullScreenshot();
+        for (const pattern of patterns) {
+            await softwareSelection.selectPattern(pattern);
+            await softwareSelection.takeScreenshot(pattern);
+        }
+        await softwareSelection.close();
     });
 }
 
@@ -507,39 +493,6 @@ exports.CongratulationPage = CongratulationPage;
 
 /***/ }),
 
-/***/ "./src/pages/dasd_page.ts":
-/*!********************************!*\
-  !*** ./src/pages/dasd_page.ts ***!
-  \********************************/
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DasdPage = void 0;
-class DasdPage {
-    page;
-    selectRow = (index) => this.page.locator(`::-p-aria(Select row ${index}[role=\\"checkbox\\"])`);
-    performAnActionToggleButton = () => this.page.locator("::-p-text('Perform an action')");
-    activateDisk = () => this.page.locator("::-p-text(Activate)");
-    backButton = () => this.page.locator("button::-p-text(Back)");
-    constructor(page) {
-        this.page = page;
-    }
-    async activateDevice() {
-        await this.selectRow(0).click();
-        await this.performAnActionToggleButton().click();
-        await this.activateDisk().click();
-    }
-    async back() {
-        await this.backButton().click();
-    }
-}
-exports.DasdPage = DasdPage;
-
-
-/***/ }),
-
 /***/ "./src/pages/login_as_root_page.ts":
 /*!*****************************************!*\
   !*** ./src/pages/login_as_root_page.ts ***!
@@ -616,52 +569,6 @@ exports.OverviewPage = OverviewPage;
 
 /***/ }),
 
-/***/ "./src/pages/select_installation_device_page.ts":
-/*!******************************************************!*\
-  !*** ./src/pages/select_installation_device_page.ts ***!
-  \******************************************************/
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SelectInstallationDevicePage = void 0;
-class SelectInstallationDevicePage {
-    page;
-    newLvmVolumeGroupInput = () => this.page.locator("::-p-text(A new LVM Volume Group)");
-    deviceCheckbox = (index) => this.page.locator(`::-p-aria(Select row ${index}[role=\\"checkbox\\"])`);
-    deviceSelectButton = () => this.page.locator("::-p-aria(Drive)");
-    deviceSelector = (name) => this.page.locator(`::-p-text(${name})`);
-    storageTechsToggleButton = () => this.page.locator("::-p-text('storage techs')");
-    deviceTypeDasdLink = () => this.page.locator("a[href='#/storage/dasd']");
-    deviceTypeZfcpLink = () => this.page.locator("a[href='#/storage/zfcp']");
-    acceptButton = () => this.page.locator("button::-p-text(Accept)");
-    constructor(page) {
-        this.page = page;
-    }
-    async installOnNewLvm() {
-        await this.newLvmVolumeGroupInput().click();
-        await this.deviceCheckbox(0).click();
-        await this.acceptButton().click();
-    }
-    async prepareDasd() {
-        await this.storageTechsToggleButton().click();
-        await this.deviceTypeDasdLink().click();
-    }
-    async prepareZfcp() {
-        await this.storageTechsToggleButton().click();
-        await this.deviceTypeZfcpLink().click();
-    }
-    async selectDevice(name) {
-        this.deviceSelectButton().click();
-        this.deviceSelector(name).click();
-    }
-}
-exports.SelectInstallationDevicePage = SelectInstallationDevicePage;
-
-
-/***/ }),
-
 /***/ "./src/pages/sidebar_page.ts":
 /*!***********************************!*\
   !*** ./src/pages/sidebar_page.ts ***!
@@ -722,54 +629,116 @@ exports.SidebarWithRegistrationPage = SidebarWithRegistrationPage;
 
 /***/ }),
 
-/***/ "./src/pages/storage_page.ts":
-/*!***********************************!*\
-  !*** ./src/pages/storage_page.ts ***!
-  \***********************************/
+/***/ "./src/pages/software_page.ts":
+/*!************************************!*\
+  !*** ./src/pages/software_page.ts ***!
+  \************************************/
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.StoragePage = void 0;
-class StoragePage {
+exports.SoftwarePage = void 0;
+class SoftwarePage {
     page;
-    changeInstallationDeviceButton = () => this.page.locator("a[href='#/storage/target-device']");
-    editEncryptionButton = () => this.page.locator("::-p-text(Edit)");
-    encryptionIsEnabledText = () => this.page.locator("::-p-text(Encryption is enabled)");
-    manageDasdLink = () => this.page.locator("::-p-text(Manage DASD devices)");
-    ActivateZfcpLink = () => this.page.locator("::-p-text(Activate zFCP disks)");
+    changeSelectionButton = () => this.page.locator("::-p-text(Change selection)");
     constructor(page) {
         this.page = page;
     }
-    async changeInstallationDevice() {
-        await this.changeInstallationDeviceButton().click();
-    }
-    async editEncryption() {
-        await this.editEncryptionButton().click();
-    }
-    async verifyEncryptionEnabled() {
-        await this.encryptionIsEnabledText().wait();
-    }
-    async manageDasd() {
-        await this.manageDasdLink().click();
-    }
-    async activateZfcp() {
-        await this.ActivateZfcpLink().click();
-    }
-    async waitForElement(element, timeout) {
-        await this.page.locator(element).setTimeout(timeout).wait();
+    async changeSelection() {
+        await this.changeSelectionButton().click();
     }
 }
-exports.StoragePage = StoragePage;
+exports.SoftwarePage = SoftwarePage;
 
 
 /***/ }),
 
-/***/ "./src/test_lvm.ts":
-/*!*************************!*\
-  !*** ./src/test_lvm.ts ***!
-  \*************************/
+/***/ "./src/pages/software_selection_page.ts":
+/*!**********************************************!*\
+  !*** ./src/pages/software_selection_page.ts ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SoftwareSelectionPage = void 0;
+const fs_1 = __webpack_require__(/*! fs */ "fs");
+const path_1 = __webpack_require__(/*! path */ "path");
+class SoftwareSelectionPage {
+    page;
+    patternCheckbox = (pattern) => this.page.locator(`input[type=checkbox][rowid=${pattern}-title]`);
+    closeButton = () => this.page.locator("::-p-text(Close)");
+    constructor(page) {
+        this.page = page;
+    }
+    // SELinux was auto selected, click will unselect it.
+    async clickCheckboxIfNotChecked(locator) {
+        const checkbox = await this.page.$(locator);
+        const isChecked = await checkbox.evaluate((checkbox) => checkbox.checked);
+        if (!isChecked) {
+            await checkbox.click();
+        }
+        else {
+            console.log("This pattern was auto selected.");
+        }
+    }
+    async clickCheckboxIfNotChecked_old(locator) {
+        const isChecked = await this.page.evaluate((checkboxSelector) => {
+            const checkbox = document.querySelector(checkboxSelector);
+            return checkbox.checked;
+        }, locator);
+        if (!isChecked) {
+            await this.page.click(locator);
+        }
+        else {
+            console.log("This pattern was auto selected.");
+        }
+    }
+    async selectPattern(pattern) {
+        const checkboxSelector = `input[type=checkbox][rowid=${pattern}-title]`;
+        const checkbox = await this.patternCheckbox(pattern).waitHandle();
+        await checkbox.scrollIntoView();
+        this.clickCheckboxIfNotChecked(checkboxSelector);
+        // Wait for the checkbox to be checked
+        await this.page.waitForSelector(`${checkboxSelector}:checked`);
+    }
+    async ensureDirectoryExistence(dirPath) {
+        const resolvedPath = (0, path_1.resolve)(dirPath);
+        if (!(0, fs_1.existsSync)(resolvedPath)) {
+            (0, fs_1.mkdirSync)(resolvedPath, { recursive: true });
+            console.log(`Directory created: ${resolvedPath}`);
+        }
+        else {
+            console.log(`Directory already exists: ${resolvedPath}`);
+        }
+    }
+    async takeScreenshot(pattern) {
+        const screenshotBuffer = await this.page.screenshot();
+        this.ensureDirectoryExistence("/run/agama/scripts");
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", `${pattern}_screenshot.png`);
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
+        console.log(`take screenshot for pattern: ${pattern}`);
+    }
+    async takeFullScreenshot() {
+        const screenshotBuffer = await this.page.screenshot({ fullPage: true });
+        const screenshotPath = (0, path_1.resolve)("/run/agama/scripts", "full_screenshot.png");
+        (0, fs_1.writeFileSync)(screenshotPath, screenshotBuffer);
+    }
+    async close() {
+        await this.closeButton().click();
+    }
+}
+exports.SoftwareSelectionPage = SoftwareSelectionPage;
+
+
+/***/ }),
+
+/***/ "./src/test_software_pattern.ts":
+/*!**************************************!*\
+  !*** ./src/test_software_pattern.ts ***!
+  \**************************************/
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
@@ -782,19 +751,17 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 // see https://nodejs.org/docs/latest-v20.x/api/test.html
 const cmdline_1 = __webpack_require__(/*! ./lib/cmdline */ "./src/lib/cmdline.ts");
 const helpers_1 = __webpack_require__(/*! ./lib/helpers */ "./src/lib/helpers.ts");
-const storage_select_installation_device_1 = __webpack_require__(/*! ./checks/storage_select_installation_device */ "./src/checks/storage_select_installation_device.ts");
 const login_1 = __webpack_require__(/*! ./checks/login */ "./src/checks/login.ts");
+const software_selection_1 = __webpack_require__(/*! ./checks/software_selection */ "./src/checks/software_selection.ts");
 const installation_1 = __webpack_require__(/*! ./checks/installation */ "./src/checks/installation.ts");
-const storage_dasd_1 = __webpack_require__(/*! ./checks/storage_dasd */ "./src/checks/storage_dasd.ts");
 // parse options from the command line
 const options = (0, cmdline_1.parse)((cmd) => cmd
-    .option("--dasd", "Prepare DASD storage (the default is not to prepare it)")
+    .option("--patterns <pattern>...", "comma-separated list of patterns", cmdline_1.commaSeparatedList)
     .option("--install", "Proceed to install the system (the default is not to install it)"));
 (0, helpers_1.test_init)(options);
 (0, login_1.logIn)(options.password);
-if (options.dasd)
-    (0, storage_dasd_1.prepareDasdStorage)();
-(0, storage_select_installation_device_1.changeInstallationDeviceToLvm)();
+if (options.patterns)
+    (0, software_selection_1.selectPatterns)(options.patterns);
 if (options.install)
     (0, installation_1.performInstallation)();
 
@@ -1183,7 +1150,7 @@ module.exports = require("zlib");
 /******/ 	// the startup function
 /******/ 	__webpack_require__.x = () => {
 /******/ 		// Load entry module and return exports
-/******/ 		var __webpack_exports__ = __webpack_require__.O(undefined, ["vendor"], () => (__webpack_require__(__webpack_require__.s = "./src/test_lvm.ts")))
+/******/ 		var __webpack_exports__ = __webpack_require__.O(undefined, ["vendor"], () => (__webpack_require__(__webpack_require__.s = "./src/test_software_pattern.ts")))
 /******/ 		__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
 /******/ 		return __webpack_exports__;
 /******/ 	};
@@ -1287,7 +1254,7 @@ module.exports = require("zlib");
 /******/ 		// object to store loaded chunks
 /******/ 		// "1" means "loaded", otherwise not loaded yet
 /******/ 		var installedChunks = {
-/******/ 			"test_lvm": 1
+/******/ 			"test_software_pattern": 1
 /******/ 		};
 /******/ 		
 /******/ 		__webpack_require__.O.require = (chunkId) => (installedChunks[chunkId]);
@@ -1339,4 +1306,4 @@ module.exports = require("zlib");
 /******/ 	
 /******/ })()
 ;
-//# sourceMappingURL=test_lvm.js.map
+//# sourceMappingURL=test_software_pattern.js.map
