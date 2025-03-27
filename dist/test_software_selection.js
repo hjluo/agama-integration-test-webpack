@@ -637,7 +637,29 @@ class SoftwareSelectionPage {
     constructor(page) {
         this.page = page;
     }
+    // SELinux was auto selected, click will unselect it.
+    async clickIfNotChecked(selector, pattern) {
+        const checkbox = await this.page.$(selector);
+        const isChecked = await checkbox.evaluate((cb) => cb.checked);
+        if (!isChecked) {
+            await checkbox.click();
+        }
+        else {
+            console.log(`Pattern ${pattern} was auto selected`);
+        }
+    }
     async selectPattern(pattern) {
+        const checkbox = await this.patternCheckbox(pattern).waitHandle();
+        await checkbox.scrollIntoView();
+        // const checkbox = await this.patternCheckbox(pattern).waitHandle();
+        // const isChecked = await checkbox.evaluate((cb: HTMLInputElement) => cb.checked);
+        const isChecked = await checkbox.evaluate((cb) => cb.checked);
+        console.log(`Checkbox for pattern ${pattern} is ${isChecked ? "checked" : "not checked"}`);
+        if (isChecked) {
+            console.log(`Patter ${pattern} is auto selected ==>`);
+            return;
+        }
+        console.log(`Adding pattern ${pattern} >>>`);
         await this.patternCheckbox(pattern)
             .filter((input) => !input.checked)
             .click();
@@ -645,6 +667,7 @@ class SoftwareSelectionPage {
         await this.patternCheckbox(pattern)
             .filter((input) => input.checked)
             .wait();
+        console.log(`Added pattern ${pattern} <<<`);
     }
     async close() {
         await this.closeButton().click();
