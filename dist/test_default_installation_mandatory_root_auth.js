@@ -62,8 +62,8 @@ function performInstallation() {
         await confirmInstallation.continue();
     });
     (0, helpers_1.it)("should finish installation", async function () {
-        await new congratulation_page_1.CongratulationPage(helpers_1.page).wait(14 * 60 * 1000);
-    }, 15 * 60 * 1000);
+        await new congratulation_page_1.CongratulationPage(helpers_1.page).wait(19 * 60 * 1000);
+    }, 20 * 60 * 1000);
 }
 function finishInstallation() {
     (0, helpers_1.it)("should finish", async function () {

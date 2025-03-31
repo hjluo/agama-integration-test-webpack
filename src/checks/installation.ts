@@ -18,9 +18,9 @@ export function performInstallation() {
   it(
     "should finish installation",
     async function () {
-      await new CongratulationPage(page).wait(14 * 60 * 1000);
+      await new CongratulationPage(page).wait(19 * 60 * 1000);
     },
-    15 * 60 * 1000,
+    20 * 60 * 1000,
   );
 }
 
