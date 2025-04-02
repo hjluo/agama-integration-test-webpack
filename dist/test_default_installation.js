@@ -28,8 +28,6 @@ function createFirstUser(password) {
         await createFirstUser.fillPassword(password);
         await createFirstUser.fillPasswordConfirmation(password);
         await createFirstUser.accept();
-        // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-        await (0, helpers_1.sleep)(2000);
     });
 }
 
@@ -737,7 +735,7 @@ class CreateFirstUserPage {
         await this.passwordConfirmationInput().fill(password);
     }
     async accept() {
-        await this.acceptButton().click();
+        await Promise.all([this.acceptButton().click()]);
     }
 }
 exports.CreateFirstUserPage = CreateFirstUserPage;

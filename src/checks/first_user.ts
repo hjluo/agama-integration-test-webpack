@@ -1,4 +1,4 @@
-import { it, page, sleep } from "../lib/helpers";
+import { it, page } from "../lib/helpers";
 import { CreateFirstUserPage } from "../pages/create_user_page";
 import { UsersPage } from "../pages/users_page";
 import { SidebarPage } from "../pages/sidebar_page";
@@ -17,7 +17,5 @@ export function createFirstUser(password: string) {
     await createFirstUser.fillPassword(password);
     await createFirstUser.fillPasswordConfirmation(password);
     await createFirstUser.accept();
-    // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-    await sleep(2000);
   });
 }

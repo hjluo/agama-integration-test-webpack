@@ -31,6 +31,6 @@ export class CreateFirstUserPage {
   }
 
   async accept() {
-    await this.acceptButton().click();
+    await Promise.all([this.acceptButton().click()]);
   }
 }
