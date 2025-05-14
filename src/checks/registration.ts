@@ -1,4 +1,4 @@
-import { it, page } from "../lib/helpers";
+import { it, page, dumpPage } from "../lib/helpers";
 import { OverviewPage } from "../pages/overview_page";
 import { ProductRegistrationPage, ExtensionHaRegistrationPage } from "../pages/registration_page";
 import { SidebarWithRegistrationPage } from "../pages/sidebar_page";
@@ -23,9 +23,15 @@ export function enterRegistrationHa(code: string) {
     const sidebar = new SidebarWithRegistrationPage(page);
     const extensionRegistration = new ExtensionHaRegistrationPage(page);
 
+    const logDir = "/run/agama/scripts";
+    await dumpPage(logDir, "Before_goToRegistration");
     await sidebar.goToRegistration();
+    await dumpPage(logDir, "After_goToRegistration");
     await extensionRegistration.fillCode(code);
+    await dumpPage(logDir, "After_Fill_HA_regcode");
     await extensionRegistration.register();
+    await dumpPage(logDir, "After_register");
     await extensionRegistration.verifyExtensionRegistration();
+    await dumpPage(logDir, "After_verifyExtensionRegistration");
   });
 }

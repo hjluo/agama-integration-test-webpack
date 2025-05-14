@@ -21,7 +21,7 @@ class RegistrationBasePage {
   }
 
   async verifyExtensionRegistration() {
-    await this.extensionRegisteredText().wait();
+    await this.extensionRegisteredText().setTimeout(30000).wait();
   }
 }
 
