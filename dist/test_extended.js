@@ -43,15 +43,26 @@ function createFirstUser(password) {
         const users = new users_page_1.UsersPage(helpers_1.page);
         const createFirstUser = new create_user_page_1.CreateFirstUserPage(helpers_1.page);
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
+        const logDir = "/run/agama/scripts";
+        await sidebar.waitOverviewVisible(50000);
         await sidebar.goToUsers();
         await users.defineAUserNow();
+        await createFirstUser.verifyPageHeading();
+        await (0, helpers_1.dumpPage)(logDir, "Create_first_user");
         await createFirstUser.fillFullName("Bernhard M. Wiedemann");
+        await (0, helpers_1.dumpPage)(logDir, "After_full_name");
+        await createFirstUser.verifyPageHeading();
         await createFirstUser.fillUserName("bernhard");
+        await (0, helpers_1.dumpPage)(logDir, "After_User_name");
+        await createFirstUser.verifyPageHeading();
         await createFirstUser.fillPassword(password);
+        await (0, helpers_1.dumpPage)(logDir, "After_password");
+        await createFirstUser.verifyPageHeading();
         await createFirstUser.fillPasswordConfirmation(password);
+        await (0, helpers_1.dumpPage)(logDir, "after_fillPasswordConfirmation");
         await createFirstUser.accept();
-        // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-        await (0, helpers_1.sleep)(2000);
+        await createFirstUser.waitInstallExclamationToDisappear();
+        await (0, helpers_1.dumpPage)(logDir, "user_after_first_user_Accept");
     });
 }
 
@@ -632,7 +643,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     // base file name for the dumps
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
@@ -657,10 +670,8 @@ async function it(label, test, timeout) {
                 failed = true;
             if (exports.page) {
                 // dump the current page
-                if (!fs_1.default.existsSync(dir))
-                    fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
@@ -771,6 +782,7 @@ class CreateFirstUserPage {
         await this.usernameInput().fill(userName);
     }
     async fillPassword(password) {
+        await this.passwordInput().click();
         await this.passwordInput().fill(password);
     }
     async fillPasswordConfirmation(password) {
@@ -778,6 +790,40 @@ class CreateFirstUserPage {
     }
     async accept() {
         await this.acceptButton().click();
+    }
+    async verifyPageHeading() {
+        const heading = await this.page.locator("h2::-p-text(Create user)");
+        await heading.wait();
+        return heading;
+    }
+    // wait exclamation marks to disappear after registration and create
+    // first usrer.
+    async waitInstallExclamationToDisappear() {
+        await this.page.waitForSelector("button.agm-install-button", { visible: true });
+        try {
+            // Check if the button has an exclamation mark
+            const hasExclamationMark = await this.page.evaluate(() => {
+                const button = document.querySelector("button.agm-install-button");
+                return button && button.querySelector('svg[data-icon-name="error_fill"]') !== null;
+            });
+            if (hasExclamationMark) {
+                console.log("Install button has exclamation mark. Waiting for it to disappear...");
+                // Wait for the exclamation mark to disappear
+                await this.page.waitForFunction(() => {
+                    const button = document.querySelector("button.agm-install-button");
+                    return button && !button.querySelector('svg[data-icon-name="error_fill"]');
+                }, { timeout: 30000 }); // 30 second timeout
+            }
+            else {
+                console.log("Install button is already ready for installation.");
+            }
+        }
+        catch (error) {
+            console.error("Error waiting for Install button to be ready:", error);
+            throw error;
+        }
+        // Return the Install button for further actions
+        return await this.page.$("button.agm-install-button");
     }
 }
 exports.CreateFirstUserPage = CreateFirstUserPage;

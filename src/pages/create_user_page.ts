@@ -23,6 +23,7 @@ export class CreateFirstUserPage {
   }
 
   async fillPassword(password: string) {
+    await this.passwordInput().click();
     await this.passwordInput().fill(password);
   }
 
@@ -32,5 +33,43 @@ export class CreateFirstUserPage {
 
   async accept() {
     await this.acceptButton().click();
+  }
+
+  async verifyPageHeading() {
+    const heading = await this.page.locator("h2::-p-text(Create user)");
+    await heading.wait();
+    return heading;
+  }
+
+  // wait exclamation marks to disappear after registration and create
+  // first usrer.
+  async waitInstallExclamationToDisappear() {
+    await this.page.waitForSelector("button.agm-install-button", { visible: true });
+    try {
+      // Check if the button has an exclamation mark
+      const hasExclamationMark = await this.page.evaluate(() => {
+        const button = document.querySelector("button.agm-install-button");
+        return button && button.querySelector('svg[data-icon-name="error_fill"]') !== null;
+      });
+
+      if (hasExclamationMark) {
+        console.log("Install button has exclamation mark. Waiting for it to disappear...");
+        // Wait for the exclamation mark to disappear
+        await this.page.waitForFunction(
+          () => {
+            const button = document.querySelector("button.agm-install-button");
+            return button && !button.querySelector('svg[data-icon-name="error_fill"]');
+          },
+          { timeout: 30000 },
+        ); // 30 second timeout
+      } else {
+        console.log("Install button is already ready for installation.");
+      }
+    } catch (error) {
+      console.error("Error waiting for Install button to be ready:", error);
+      throw error;
+    }
+    // Return the Install button for further actions
+    return await this.page.$("button.agm-install-button");
   }
 }
