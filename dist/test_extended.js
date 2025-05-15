@@ -43,6 +43,9 @@ function createFirstUser(password) {
         const users = new users_page_1.UsersPage(helpers_1.page);
         const createFirstUser = new create_user_page_1.CreateFirstUserPage(helpers_1.page);
         const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
+        // On slow Arches, after registration there will be Configuring
+        // product page still running.
+        await sidebar.waitOverviewVisible(50000);
         await sidebar.goToUsers();
         await users.defineAUserNow();
         await createFirstUser.fillFullName("Bernhard M. Wiedemann");
@@ -50,8 +53,6 @@ function createFirstUser(password) {
         await createFirstUser.fillPassword(password);
         await createFirstUser.fillPasswordConfirmation(password);
         await createFirstUser.accept();
-        // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-        await (0, helpers_1.sleep)(2000);
     });
 }
 

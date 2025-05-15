@@ -9,6 +9,9 @@ export function createFirstUser(password: string) {
     const createFirstUser = new CreateFirstUserPage(page);
     const sidebar = new SidebarPage(page);
 
+    // On slow Arches, after registration there will be Configuring
+    // product page still running.
+    await sidebar.waitOverviewVisible(50000);
     await sidebar.goToUsers();
 
     await users.defineAUserNow();
@@ -17,7 +20,5 @@ export function createFirstUser(password: string) {
     await createFirstUser.fillPassword(password);
     await createFirstUser.fillPasswordConfirmation(password);
     await createFirstUser.accept();
-    // puppeteer goes too fast and screen is unresponsive after submit, a small delay helps
-    await sleep(2000);
   });
 }
