@@ -114,7 +114,12 @@ const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.t
 const login_as_root_page_1 = __webpack_require__(/*! ../pages/login_as_root_page */ "./src/pages/login_as_root_page.ts");
 function logIn(password) {
     (0, helpers_1.it)("should have Agama page title", async function () {
+        const logDir = "/run/agama/scripts";
+        console.log("before dumpPage Agama_Page");
+        await (0, helpers_1.dumpPage)(logDir, "Agama_Page");
+        console.log("before assert.deepEqual");
         strict_1.default.deepEqual(await helpers_1.page.title(), "Agama");
+        console.log("after assert.deepEqual");
     });
     (0, helpers_1.it)("should allow logging in", async function () {
         const loginAsRoot = new login_as_root_page_1.LoginAsRootPage(helpers_1.page);
@@ -226,8 +231,13 @@ function enterRegistrationHa(code) {
         const sidebar = new sidebar_page_1.SidebarWithRegistrationPage(helpers_1.page);
         const extensionRegistration = new registration_page_1.ExtensionHaRegistrationPage(helpers_1.page);
         await sidebar.goToRegistration();
+        const logDir = "/run/agama/scripts";
+        await (0, helpers_1.dumpPage)(logDir, "Before_fillcode");
         await extensionRegistration.fillCode(code);
+        await (0, helpers_1.dumpPage)(logDir, "After_fillcode");
         await extensionRegistration.register();
+        await (0, helpers_1.dumpPage)(logDir, "After_register");
+        await (0, helpers_1.dumpPage)(logDir, "before_verifyExtensionRegistration");
         await extensionRegistration.verifyExtensionRegistration();
     });
 }
@@ -928,6 +938,7 @@ class RegistrationBasePage {
         await this.registerButton().click();
     }
     async verifyExtensionRegistration() {
+        await this.page.locator("button::-p-text(Register):not([disabled])").setTimeout(30000).wait();
         await this.extensionRegisteredText().wait();
     }
 }

@@ -58,7 +58,12 @@ const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.t
 const login_as_root_page_1 = __webpack_require__(/*! ../pages/login_as_root_page */ "./src/pages/login_as_root_page.ts");
 function logIn(password) {
     (0, helpers_1.it)("should have Agama page title", async function () {
+        const logDir = "/run/agama/scripts";
+        console.log("before dumpPage Agama_Page");
+        await (0, helpers_1.dumpPage)(logDir, "Agama_Page");
+        console.log("before assert.deepEqual");
         strict_1.default.deepEqual(await helpers_1.page.title(), "Agama");
+        console.log("after assert.deepEqual");
     });
     (0, helpers_1.it)("should allow logging in", async function () {
         const loginAsRoot = new login_as_root_page_1.LoginAsRootPage(helpers_1.page);

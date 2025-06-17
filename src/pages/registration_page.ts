@@ -21,6 +21,7 @@ class RegistrationBasePage {
   }
 
   async verifyExtensionRegistration() {
+    await this.page.locator("button::-p-text(Register):not([disabled])").setTimeout(30000).wait();
     await this.extensionRegisteredText().wait();
   }
 }
