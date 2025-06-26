@@ -765,15 +765,19 @@ class CreateFirstUserPage {
     }
     async fillFullName(fullName) {
         await this.fullNameInput().fill(fullName);
+        console.log("fillFullName passed");
     }
     async fillUserName(userName) {
         await this.usernameInput().fill(userName);
+        console.log("fillUserName passed");
     }
     async fillPassword(password) {
         await this.passwordInput().fill(password);
+        console.log("fillPassword passed");
     }
     async fillPasswordConfirmation(password) {
         await this.passwordConfirmationInput().fill(password);
+        console.log("fillPasswordConfirmation passed");
     }
     async accept() {
         await this.acceptButton().click();
