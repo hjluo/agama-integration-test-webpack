@@ -288,6 +288,7 @@ let browser;
 let url;
 // directory for storing the dumped data after a failure
 const dir = "log";
+const consoleLogs = [];
 // helper function for configuring the browser
 function browserSettings(name) {
     switch (name.toLowerCase()) {
@@ -327,6 +328,54 @@ async function startBrowser(headless, slowMo, agamaBrowser, agamaServer) {
     });
     exports.page = await browser.newPage();
     exports.page.setDefaultTimeout(20000);
+    exports.page.on('console', (msg) => {
+        const text = msg.text();
+        const type = msg.type();
+        // Check if this log is related to user creation
+        const isUserRelated = text.includes('user') ||
+            text.includes('User') ||
+            text.includes('create') ||
+            text.includes('FirstUser') ||
+            text.includes('fullName') ||
+            text.includes('userName') ||
+            text.includes('password') ||
+            text.includes('firstUserForm');
+        const logEntry = {
+            type,
+            text,
+            timestamp: new Date().toISOString(),
+            location: msg.location(),
+            isUserRelated
+        };
+        consoleLogs.push(logEntry);
+        // Immediately log user-related messages for debugging
+        if (isUserRelated) {
+            console.log(`[USER-CREATION] ${type.toUpperCase()}: ${text}`);
+        }
+    });
+    // Also capture network requests related to user creation
+    exports.page.on('request', request => {
+        const url = request.url();
+        if (url.includes('/users') || url.includes('/api/users') || url.includes('first')) {
+            consoleLogs.push({
+                timestamp: new Date().toISOString(),
+                type: 'REQUEST',
+                text: `${request.method()} ${url}`,
+                isUserRelated: true
+            });
+        }
+    });
+    exports.page.on('response', response => {
+        const url = response.url();
+        if (url.includes('/users') || url.includes('/api/users') || url.includes('first')) {
+            consoleLogs.push({
+                timestamp: new Date().toISOString(),
+                type: 'RESPONSE',
+                text: `${response.status()} ${url}`,
+                isUserRelated: true
+            });
+        }
+    });
     await exports.page.goto(agamaServer, {
         timeout: 60000,
         waitUntil: "domcontentloaded",
@@ -395,6 +444,29 @@ async function dumpCSS() {
         });
     });
 }
+// Enhanced dump function with filtering options
+async function dumpConsole(label, consoleLogs, userRelatedOnly = false) {
+    const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
+    // Filter logs if requested
+    const logsToWrite = userRelatedOnly
+        ? consoleLogs.filter(log => log.isUserRelated)
+        : consoleLogs;
+    if (logsToWrite.length > 0) {
+        const logContent = logsToWrite.map(log => {
+            const locationInfo = log.location ?
+                ` (${log.location.url}:${log.location.lineNumber})` : '';
+            const userFlag = log.isUserRelated ? ' [USER-RELATED]' : '';
+            return `[${log.timestamp}] ${log.type.toUpperCase()}${userFlag}: ${log.text}${locationInfo}`;
+        }).join('\n');
+        // Write both full logs and user-specific logs
+        fs_1.default.writeFileSync(name + ".console.log", logContent);
+        if (!userRelatedOnly && logsToWrite.some(log => log.isUserRelated)) {
+            const userLogs = consoleLogs.filter(log => log.isUserRelated);
+            const userLogContent = userLogs.map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.text}`).join('\n');
+            fs_1.default.writeFileSync(name + ".user-console.log", userLogContent);
+        }
+    }
+}
 // dump the current page displayed in puppeteer
 async function dumpPage(label) {
     // base file name for the dumps
@@ -424,7 +496,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(label), dumpCSS(), dumpConsole(label, consoleLogs)]);
             }
             throw new Error("Test failed!", { cause: error });
         }

@@ -95,17 +95,17 @@ export async function startBrowser(
                           text.includes('password') ||
                           text.includes('firstUserForm');
     const logEntry: ConsoleLogEntry = {
-      type,
-      text,
+      type: type,
+      text: text,
       timestamp: new Date().toISOString(),
       location: msg.location(),
-      isUserRelated
+      isUserRelated: isUserRelated
     };
     consoleLogs.push(logEntry);
 
     // Immediately log user-related messages for debugging
     if (isUserRelated) {
-      console.log(`[USER-CREATION] ${type.toUpperCase()}: ${text}`);
+        console.log(`[USER-CREATION] ${type.toUpperCase()}: ${text}`);
     }
   });
 
@@ -113,24 +113,24 @@ export async function startBrowser(
   page.on('request', request => {
     const url = request.url();
     if (url.includes('/users') || url.includes('/api/users') || url.includes('first')) {
-      consoleLogs.push({
+        consoleLogs.push({
         timestamp: new Date().toISOString(),
-        type: 'REQUEST',
-        text: `${request.method()} ${url}`,
-        isUserRelated: true
-      });
+    type: 'REQUEST',
+    text: `${request.method()} ${url}`,
+    isUserRelated: true
+    });
     }
   });
 
   page.on('response', response => {
     const url = response.url();
     if (url.includes('/users') || url.includes('/api/users') || url.includes('first')) {
-      consoleLogs.push({
+        consoleLogs.push({
         timestamp: new Date().toISOString(),
-        type: 'RESPONSE',
-        text: `${response.status()} ${url}`,
-        isUserRelated: true
-      });
+    type: 'RESPONSE',
+    text: `${response.status()} ${url}`,
+    isUserRelated: true
+    });
     }
   });
   await page.goto(agamaServer, {
@@ -214,35 +214,8 @@ async function dumpCSS() {
   });
 }
 
-// Enhanced dump function with filtering options
-async function dumpConsole(label: string, consoleLogs: ConsoleLogEntry[], userRelatedOnly: boolean = false) {
-  const name = path.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
+// dump the console logs from puppeteer
 
-  // Filter logs if requested
-  const logsToWrite = userRelatedOnly
-    ? consoleLogs.filter(log => log.isUserRelated)
-    : consoleLogs;
-
-  if (logsToWrite.length > 0) {
-    const logContent = logsToWrite.map(log => {
-      const locationInfo = log.location ?
-        ` (${log.location.url}:${log.location.lineNumber})` : '';
-      const userFlag = log.isUserRelated ? ' [USER-RELATED]' : '';
-      return `[${log.timestamp}] ${log.type.toUpperCase()}${userFlag}: ${log.text}${locationInfo}`;
-    }).join('\n');
-
-    // Write both full logs and user-specific logs
-    fs.writeFileSync(name + ".console.log", logContent);
-
-    if (!userRelatedOnly && logsToWrite.some(log => log.isUserRelated)) {
-      const userLogs = consoleLogs.filter(log => log.isUserRelated);
-      const userLogContent = userLogs.map(log =>
-        `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.text}`
-      ).join('\n');
-      fs.writeFileSync(name + ".user-console.log", userLogContent);
-    }
-  }
-}
 // dump the current page displayed in puppeteer
 export async function dumpPage(label: string) {
   // base file name for the dumps

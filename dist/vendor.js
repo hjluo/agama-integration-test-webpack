@@ -2,6 +2,3998 @@ exports.id = "vendor";
 exports.ids = ["vendor"];
 exports.modules = {
 
+/***/ "./node_modules/@puppeteer/browsers/node_modules/debug/src/browser.js":
+/*!****************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/debug/src/browser.js ***!
+  \****************************************************************************/
+/***/ ((module, exports, __webpack_require__) => {
+
+/* eslint-env browser */
+
+/**
+ * This is the web browser implementation of `debug()`.
+ */
+
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = localstorage();
+exports.destroy = (() => {
+	let warned = false;
+
+	return () => {
+		if (!warned) {
+			warned = true;
+			console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+		}
+	};
+})();
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+	'#0000CC',
+	'#0000FF',
+	'#0033CC',
+	'#0033FF',
+	'#0066CC',
+	'#0066FF',
+	'#0099CC',
+	'#0099FF',
+	'#00CC00',
+	'#00CC33',
+	'#00CC66',
+	'#00CC99',
+	'#00CCCC',
+	'#00CCFF',
+	'#3300CC',
+	'#3300FF',
+	'#3333CC',
+	'#3333FF',
+	'#3366CC',
+	'#3366FF',
+	'#3399CC',
+	'#3399FF',
+	'#33CC00',
+	'#33CC33',
+	'#33CC66',
+	'#33CC99',
+	'#33CCCC',
+	'#33CCFF',
+	'#6600CC',
+	'#6600FF',
+	'#6633CC',
+	'#6633FF',
+	'#66CC00',
+	'#66CC33',
+	'#9900CC',
+	'#9900FF',
+	'#9933CC',
+	'#9933FF',
+	'#99CC00',
+	'#99CC33',
+	'#CC0000',
+	'#CC0033',
+	'#CC0066',
+	'#CC0099',
+	'#CC00CC',
+	'#CC00FF',
+	'#CC3300',
+	'#CC3333',
+	'#CC3366',
+	'#CC3399',
+	'#CC33CC',
+	'#CC33FF',
+	'#CC6600',
+	'#CC6633',
+	'#CC9900',
+	'#CC9933',
+	'#CCCC00',
+	'#CCCC33',
+	'#FF0000',
+	'#FF0033',
+	'#FF0066',
+	'#FF0099',
+	'#FF00CC',
+	'#FF00FF',
+	'#FF3300',
+	'#FF3333',
+	'#FF3366',
+	'#FF3399',
+	'#FF33CC',
+	'#FF33FF',
+	'#FF6600',
+	'#FF6633',
+	'#FF9900',
+	'#FF9933',
+	'#FFCC00',
+	'#FFCC33'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+// eslint-disable-next-line complexity
+function useColors() {
+	// NB: In an Electron preload script, document will be defined but not fully
+	// initialized. Since we know we're in Chrome, we'll just detect this case
+	// explicitly
+	if (typeof window !== 'undefined' && window.process && (window.process.type === 'renderer' || window.process.__nwjs)) {
+		return true;
+	}
+
+	// Internet Explorer and Edge do not support colors.
+	if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+		return false;
+	}
+
+	// Is webkit? http://stackoverflow.com/a/16459606/376773
+	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
+		// Is firebug? http://stackoverflow.com/a/398120/376773
+		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
+		// Is firefox >= v31?
+		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		// Double check webkit in userAgent just in case we are in a worker
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+}
+
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+	args[0] = (this.useColors ? '%c' : '') +
+		this.namespace +
+		(this.useColors ? ' %c' : ' ') +
+		args[0] +
+		(this.useColors ? '%c ' : ' ') +
+		'+' + module.exports.humanize(this.diff);
+
+	if (!this.useColors) {
+		return;
+	}
+
+	const c = 'color: ' + this.color;
+	args.splice(1, 0, c, 'color: inherit');
+
+	// The final "%c" is somewhat tricky, because there could be other
+	// arguments passed either before or after the %c, so we need to
+	// figure out the correct index to insert the CSS into
+	let index = 0;
+	let lastC = 0;
+	args[0].replace(/%[a-zA-Z%]/g, match => {
+		if (match === '%%') {
+			return;
+		}
+		index++;
+		if (match === '%c') {
+			// We only are interested in the *last* %c
+			// (the user may have provided their own)
+			lastC = index;
+		}
+	});
+
+	args.splice(lastC, 0, c);
+}
+
+/**
+ * Invokes `console.debug()` when available.
+ * No-op when `console.debug` is not a "function".
+ * If `console.debug` is not available, falls back
+ * to `console.log`.
+ *
+ * @api public
+ */
+exports.log = console.debug || console.log || (() => {});
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+function save(namespaces) {
+	try {
+		if (namespaces) {
+			exports.storage.setItem('debug', namespaces);
+		} else {
+			exports.storage.removeItem('debug');
+		}
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+function load() {
+	let r;
+	try {
+		r = exports.storage.getItem('debug');
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+
+	// If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+	if (!r && typeof process !== 'undefined' && 'env' in process) {
+		r = process.env.DEBUG;
+	}
+
+	return r;
+}
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage() {
+	try {
+		// TVMLKit (Apple TV JS Runtime) does not have a window object, just localStorage in the global context
+		// The Browser also has localStorage in the global context.
+		return localStorage;
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+module.exports = __webpack_require__(/*! ./common */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/common.js")(exports);
+
+const {formatters} = module.exports;
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+formatters.j = function (v) {
+	try {
+		return JSON.stringify(v);
+	} catch (error) {
+		return '[UnexpectedJSONParseError]: ' + error.message;
+	}
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/debug/src/common.js":
+/*!***************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/debug/src/common.js ***!
+  \***************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ */
+
+function setup(env) {
+	createDebug.debug = createDebug;
+	createDebug.default = createDebug;
+	createDebug.coerce = coerce;
+	createDebug.disable = disable;
+	createDebug.enable = enable;
+	createDebug.enabled = enabled;
+	createDebug.humanize = __webpack_require__(/*! ms */ "./node_modules/@puppeteer/browsers/node_modules/ms/index.js");
+	createDebug.destroy = destroy;
+
+	Object.keys(env).forEach(key => {
+		createDebug[key] = env[key];
+	});
+
+	/**
+	* The currently active debug mode names, and names to skip.
+	*/
+
+	createDebug.names = [];
+	createDebug.skips = [];
+
+	/**
+	* Map of special "%n" handling functions, for the debug "format" argument.
+	*
+	* Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+	*/
+	createDebug.formatters = {};
+
+	/**
+	* Selects a color for a debug namespace
+	* @param {String} namespace The namespace string for the debug instance to be colored
+	* @return {Number|String} An ANSI color code for the given namespace
+	* @api private
+	*/
+	function selectColor(namespace) {
+		let hash = 0;
+
+		for (let i = 0; i < namespace.length; i++) {
+			hash = ((hash << 5) - hash) + namespace.charCodeAt(i);
+			hash |= 0; // Convert to 32bit integer
+		}
+
+		return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+	}
+	createDebug.selectColor = selectColor;
+
+	/**
+	* Create a debugger with the given `namespace`.
+	*
+	* @param {String} namespace
+	* @return {Function}
+	* @api public
+	*/
+	function createDebug(namespace) {
+		let prevTime;
+		let enableOverride = null;
+		let namespacesCache;
+		let enabledCache;
+
+		function debug(...args) {
+			// Disabled?
+			if (!debug.enabled) {
+				return;
+			}
+
+			const self = debug;
+
+			// Set `diff` timestamp
+			const curr = Number(new Date());
+			const ms = curr - (prevTime || curr);
+			self.diff = ms;
+			self.prev = prevTime;
+			self.curr = curr;
+			prevTime = curr;
+
+			args[0] = createDebug.coerce(args[0]);
+
+			if (typeof args[0] !== 'string') {
+				// Anything else let's inspect with %O
+				args.unshift('%O');
+			}
+
+			// Apply any `formatters` transformations
+			let index = 0;
+			args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+				// If we encounter an escaped % then don't increase the array index
+				if (match === '%%') {
+					return '%';
+				}
+				index++;
+				const formatter = createDebug.formatters[format];
+				if (typeof formatter === 'function') {
+					const val = args[index];
+					match = formatter.call(self, val);
+
+					// Now we need to remove `args[index]` since it's inlined in the `format`
+					args.splice(index, 1);
+					index--;
+				}
+				return match;
+			});
+
+			// Apply env-specific formatting (colors, etc.)
+			createDebug.formatArgs.call(self, args);
+
+			const logFn = self.log || createDebug.log;
+			logFn.apply(self, args);
+		}
+
+		debug.namespace = namespace;
+		debug.useColors = createDebug.useColors();
+		debug.color = createDebug.selectColor(namespace);
+		debug.extend = extend;
+		debug.destroy = createDebug.destroy; // XXX Temporary. Will be removed in the next major release.
+
+		Object.defineProperty(debug, 'enabled', {
+			enumerable: true,
+			configurable: false,
+			get: () => {
+				if (enableOverride !== null) {
+					return enableOverride;
+				}
+				if (namespacesCache !== createDebug.namespaces) {
+					namespacesCache = createDebug.namespaces;
+					enabledCache = createDebug.enabled(namespace);
+				}
+
+				return enabledCache;
+			},
+			set: v => {
+				enableOverride = v;
+			}
+		});
+
+		// Env-specific initialization logic for debug instances
+		if (typeof createDebug.init === 'function') {
+			createDebug.init(debug);
+		}
+
+		return debug;
+	}
+
+	function extend(namespace, delimiter) {
+		const newDebug = createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+		newDebug.log = this.log;
+		return newDebug;
+	}
+
+	/**
+	* Enables a debug mode by namespaces. This can include modes
+	* separated by a colon and wildcards.
+	*
+	* @param {String} namespaces
+	* @api public
+	*/
+	function enable(namespaces) {
+		createDebug.save(namespaces);
+		createDebug.namespaces = namespaces;
+
+		createDebug.names = [];
+		createDebug.skips = [];
+
+		let i;
+		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+		const len = split.length;
+
+		for (i = 0; i < len; i++) {
+			if (!split[i]) {
+				// ignore empty strings
+				continue;
+			}
+
+			namespaces = split[i].replace(/\*/g, '.*?');
+
+			if (namespaces[0] === '-') {
+				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+			} else {
+				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+			}
+		}
+	}
+
+	/**
+	* Disable debug output.
+	*
+	* @return {String} namespaces
+	* @api public
+	*/
+	function disable() {
+		const namespaces = [
+			...createDebug.names.map(toNamespace),
+			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+		].join(',');
+		createDebug.enable('');
+		return namespaces;
+	}
+
+	/**
+	* Returns true if the given mode name is enabled, false otherwise.
+	*
+	* @param {String} name
+	* @return {Boolean}
+	* @api public
+	*/
+	function enabled(name) {
+		if (name[name.length - 1] === '*') {
+			return true;
+		}
+
+		let i;
+		let len;
+
+		for (i = 0, len = createDebug.skips.length; i < len; i++) {
+			if (createDebug.skips[i].test(name)) {
+				return false;
+			}
+		}
+
+		for (i = 0, len = createDebug.names.length; i < len; i++) {
+			if (createDebug.names[i].test(name)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	* Convert regexp to namespace
+	*
+	* @param {RegExp} regxep
+	* @return {String} namespace
+	* @api private
+	*/
+	function toNamespace(regexp) {
+		return regexp.toString()
+			.substring(2, regexp.toString().length - 2)
+			.replace(/\.\*\?$/, '*');
+	}
+
+	/**
+	* Coerce `val`.
+	*
+	* @param {Mixed} val
+	* @return {Mixed}
+	* @api private
+	*/
+	function coerce(val) {
+		if (val instanceof Error) {
+			return val.stack || val.message;
+		}
+		return val;
+	}
+
+	/**
+	* XXX DO NOT USE. This is a temporary stub function.
+	* XXX It WILL be removed in the next major release.
+	*/
+	function destroy() {
+		console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+	}
+
+	createDebug.enable(createDebug.load());
+
+	return createDebug;
+}
+
+module.exports = setup;
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/debug/src/index.js":
+/*!**************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/debug/src/index.js ***!
+  \**************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+/**
+ * Detect Electron renderer / nwjs process, which is node, but we should
+ * treat as a browser.
+ */
+
+if (typeof process === 'undefined' || process.type === 'renderer' || process.browser === true || process.__nwjs) {
+	module.exports = __webpack_require__(/*! ./browser.js */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/browser.js");
+} else {
+	module.exports = __webpack_require__(/*! ./node.js */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/node.js");
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/debug/src/node.js":
+/*!*************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/debug/src/node.js ***!
+  \*************************************************************************/
+/***/ ((module, exports, __webpack_require__) => {
+
+/**
+ * Module dependencies.
+ */
+
+const tty = __webpack_require__(/*! tty */ "tty");
+const util = __webpack_require__(/*! util */ "util");
+
+/**
+ * This is the Node.js implementation of `debug()`.
+ */
+
+exports.init = init;
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.destroy = util.deprecate(
+	() => {},
+	'Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.'
+);
+
+/**
+ * Colors.
+ */
+
+exports.colors = [6, 2, 3, 4, 5, 1];
+
+try {
+	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
+	// eslint-disable-next-line import/no-extraneous-dependencies
+	const supportsColor = __webpack_require__(/*! supports-color */ "./node_modules/supports-color/index.js");
+
+	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+		exports.colors = [
+			20,
+			21,
+			26,
+			27,
+			32,
+			33,
+			38,
+			39,
+			40,
+			41,
+			42,
+			43,
+			44,
+			45,
+			56,
+			57,
+			62,
+			63,
+			68,
+			69,
+			74,
+			75,
+			76,
+			77,
+			78,
+			79,
+			80,
+			81,
+			92,
+			93,
+			98,
+			99,
+			112,
+			113,
+			128,
+			129,
+			134,
+			135,
+			148,
+			149,
+			160,
+			161,
+			162,
+			163,
+			164,
+			165,
+			166,
+			167,
+			168,
+			169,
+			170,
+			171,
+			172,
+			173,
+			178,
+			179,
+			184,
+			185,
+			196,
+			197,
+			198,
+			199,
+			200,
+			201,
+			202,
+			203,
+			204,
+			205,
+			206,
+			207,
+			208,
+			209,
+			214,
+			215,
+			220,
+			221
+		];
+	}
+} catch (error) {
+	// Swallow - we only care if `supports-color` is available; it doesn't have to be.
+}
+
+/**
+ * Build up the default `inspectOpts` object from the environment variables.
+ *
+ *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
+ */
+
+exports.inspectOpts = Object.keys(process.env).filter(key => {
+	return /^debug_/i.test(key);
+}).reduce((obj, key) => {
+	// Camel-case
+	const prop = key
+		.substring(6)
+		.toLowerCase()
+		.replace(/_([a-z])/g, (_, k) => {
+			return k.toUpperCase();
+		});
+
+	// Coerce string value into JS value
+	let val = process.env[key];
+	if (/^(yes|on|true|enabled)$/i.test(val)) {
+		val = true;
+	} else if (/^(no|off|false|disabled)$/i.test(val)) {
+		val = false;
+	} else if (val === 'null') {
+		val = null;
+	} else {
+		val = Number(val);
+	}
+
+	obj[prop] = val;
+	return obj;
+}, {});
+
+/**
+ * Is stdout a TTY? Colored output is enabled when `true`.
+ */
+
+function useColors() {
+	return 'colors' in exports.inspectOpts ?
+		Boolean(exports.inspectOpts.colors) :
+		tty.isatty(process.stderr.fd);
+}
+
+/**
+ * Adds ANSI color escape codes if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+	const {namespace: name, useColors} = this;
+
+	if (useColors) {
+		const c = this.color;
+		const colorCode = '\u001B[3' + (c < 8 ? c : '8;5;' + c);
+		const prefix = `  ${colorCode};1m${name} \u001B[0m`;
+
+		args[0] = prefix + args[0].split('\n').join('\n' + prefix);
+		args.push(colorCode + 'm+' + module.exports.humanize(this.diff) + '\u001B[0m');
+	} else {
+		args[0] = getDate() + name + ' ' + args[0];
+	}
+}
+
+function getDate() {
+	if (exports.inspectOpts.hideDate) {
+		return '';
+	}
+	return new Date().toISOString() + ' ';
+}
+
+/**
+ * Invokes `util.format()` with the specified arguments and writes to stderr.
+ */
+
+function log(...args) {
+	return process.stderr.write(util.format(...args) + '\n');
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+function save(namespaces) {
+	if (namespaces) {
+		process.env.DEBUG = namespaces;
+	} else {
+		// If you set a process.env field to null or undefined, it gets cast to the
+		// string 'null' or 'undefined'. Just delete instead.
+		delete process.env.DEBUG;
+	}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+	return process.env.DEBUG;
+}
+
+/**
+ * Init logic for `debug` instances.
+ *
+ * Create a new `inspectOpts` object in case `useColors` is set
+ * differently for a particular `debug` instance.
+ */
+
+function init(debug) {
+	debug.inspectOpts = {};
+
+	const keys = Object.keys(exports.inspectOpts);
+	for (let i = 0; i < keys.length; i++) {
+		debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+	}
+}
+
+module.exports = __webpack_require__(/*! ./common */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/common.js")(exports);
+
+const {formatters} = module.exports;
+
+/**
+ * Map %o to `util.inspect()`, all on a single line.
+ */
+
+formatters.o = function (v) {
+	this.inspectOpts.colors = this.useColors;
+	return util.inspect(v, this.inspectOpts)
+		.split('\n')
+		.map(str => str.trim())
+		.join(' ');
+};
+
+/**
+ * Map %O to `util.inspect()`, allowing multiple lines if needed.
+ */
+
+formatters.O = function (v) {
+	this.inspectOpts.colors = this.useColors;
+	return util.inspect(v, this.inspectOpts);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/lru-cache/index.js":
+/*!**************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/lru-cache/index.js ***!
+  \**************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+// A linked list to keep track of recently-used-ness
+const Yallist = __webpack_require__(/*! yallist */ "./node_modules/yallist/yallist.js")
+
+const MAX = Symbol('max')
+const LENGTH = Symbol('length')
+const LENGTH_CALCULATOR = Symbol('lengthCalculator')
+const ALLOW_STALE = Symbol('allowStale')
+const MAX_AGE = Symbol('maxAge')
+const DISPOSE = Symbol('dispose')
+const NO_DISPOSE_ON_SET = Symbol('noDisposeOnSet')
+const LRU_LIST = Symbol('lruList')
+const CACHE = Symbol('cache')
+const UPDATE_AGE_ON_GET = Symbol('updateAgeOnGet')
+
+const naiveLength = () => 1
+
+// lruList is a yallist where the head is the youngest
+// item, and the tail is the oldest.  the list contains the Hit
+// objects as the entries.
+// Each Hit object has a reference to its Yallist.Node.  This
+// never changes.
+//
+// cache is a Map (or PseudoMap) that matches the keys to
+// the Yallist.Node object.
+class LRUCache {
+  constructor (options) {
+    if (typeof options === 'number')
+      options = { max: options }
+
+    if (!options)
+      options = {}
+
+    if (options.max && (typeof options.max !== 'number' || options.max < 0))
+      throw new TypeError('max must be a non-negative number')
+    // Kind of weird to have a default max of Infinity, but oh well.
+    const max = this[MAX] = options.max || Infinity
+
+    const lc = options.length || naiveLength
+    this[LENGTH_CALCULATOR] = (typeof lc !== 'function') ? naiveLength : lc
+    this[ALLOW_STALE] = options.stale || false
+    if (options.maxAge && typeof options.maxAge !== 'number')
+      throw new TypeError('maxAge must be a number')
+    this[MAX_AGE] = options.maxAge || 0
+    this[DISPOSE] = options.dispose
+    this[NO_DISPOSE_ON_SET] = options.noDisposeOnSet || false
+    this[UPDATE_AGE_ON_GET] = options.updateAgeOnGet || false
+    this.reset()
+  }
+
+  // resize the cache when the max changes.
+  set max (mL) {
+    if (typeof mL !== 'number' || mL < 0)
+      throw new TypeError('max must be a non-negative number')
+
+    this[MAX] = mL || Infinity
+    trim(this)
+  }
+  get max () {
+    return this[MAX]
+  }
+
+  set allowStale (allowStale) {
+    this[ALLOW_STALE] = !!allowStale
+  }
+  get allowStale () {
+    return this[ALLOW_STALE]
+  }
+
+  set maxAge (mA) {
+    if (typeof mA !== 'number')
+      throw new TypeError('maxAge must be a non-negative number')
+
+    this[MAX_AGE] = mA
+    trim(this)
+  }
+  get maxAge () {
+    return this[MAX_AGE]
+  }
+
+  // resize the cache when the lengthCalculator changes.
+  set lengthCalculator (lC) {
+    if (typeof lC !== 'function')
+      lC = naiveLength
+
+    if (lC !== this[LENGTH_CALCULATOR]) {
+      this[LENGTH_CALCULATOR] = lC
+      this[LENGTH] = 0
+      this[LRU_LIST].forEach(hit => {
+        hit.length = this[LENGTH_CALCULATOR](hit.value, hit.key)
+        this[LENGTH] += hit.length
+      })
+    }
+    trim(this)
+  }
+  get lengthCalculator () { return this[LENGTH_CALCULATOR] }
+
+  get length () { return this[LENGTH] }
+  get itemCount () { return this[LRU_LIST].length }
+
+  rforEach (fn, thisp) {
+    thisp = thisp || this
+    for (let walker = this[LRU_LIST].tail; walker !== null;) {
+      const prev = walker.prev
+      forEachStep(this, fn, walker, thisp)
+      walker = prev
+    }
+  }
+
+  forEach (fn, thisp) {
+    thisp = thisp || this
+    for (let walker = this[LRU_LIST].head; walker !== null;) {
+      const next = walker.next
+      forEachStep(this, fn, walker, thisp)
+      walker = next
+    }
+  }
+
+  keys () {
+    return this[LRU_LIST].toArray().map(k => k.key)
+  }
+
+  values () {
+    return this[LRU_LIST].toArray().map(k => k.value)
+  }
+
+  reset () {
+    if (this[DISPOSE] &&
+        this[LRU_LIST] &&
+        this[LRU_LIST].length) {
+      this[LRU_LIST].forEach(hit => this[DISPOSE](hit.key, hit.value))
+    }
+
+    this[CACHE] = new Map() // hash of items by key
+    this[LRU_LIST] = new Yallist() // list of items in order of use recency
+    this[LENGTH] = 0 // length of items in the list
+  }
+
+  dump () {
+    return this[LRU_LIST].map(hit =>
+      isStale(this, hit) ? false : {
+        k: hit.key,
+        v: hit.value,
+        e: hit.now + (hit.maxAge || 0)
+      }).toArray().filter(h => h)
+  }
+
+  dumpLru () {
+    return this[LRU_LIST]
+  }
+
+  set (key, value, maxAge) {
+    maxAge = maxAge || this[MAX_AGE]
+
+    if (maxAge && typeof maxAge !== 'number')
+      throw new TypeError('maxAge must be a number')
+
+    const now = maxAge ? Date.now() : 0
+    const len = this[LENGTH_CALCULATOR](value, key)
+
+    if (this[CACHE].has(key)) {
+      if (len > this[MAX]) {
+        del(this, this[CACHE].get(key))
+        return false
+      }
+
+      const node = this[CACHE].get(key)
+      const item = node.value
+
+      // dispose of the old one before overwriting
+      // split out into 2 ifs for better coverage tracking
+      if (this[DISPOSE]) {
+        if (!this[NO_DISPOSE_ON_SET])
+          this[DISPOSE](key, item.value)
+      }
+
+      item.now = now
+      item.maxAge = maxAge
+      item.value = value
+      this[LENGTH] += len - item.length
+      item.length = len
+      this.get(key)
+      trim(this)
+      return true
+    }
+
+    const hit = new Entry(key, value, len, now, maxAge)
+
+    // oversized objects fall out of cache automatically.
+    if (hit.length > this[MAX]) {
+      if (this[DISPOSE])
+        this[DISPOSE](key, value)
+
+      return false
+    }
+
+    this[LENGTH] += hit.length
+    this[LRU_LIST].unshift(hit)
+    this[CACHE].set(key, this[LRU_LIST].head)
+    trim(this)
+    return true
+  }
+
+  has (key) {
+    if (!this[CACHE].has(key)) return false
+    const hit = this[CACHE].get(key).value
+    return !isStale(this, hit)
+  }
+
+  get (key) {
+    return get(this, key, true)
+  }
+
+  peek (key) {
+    return get(this, key, false)
+  }
+
+  pop () {
+    const node = this[LRU_LIST].tail
+    if (!node)
+      return null
+
+    del(this, node)
+    return node.value
+  }
+
+  del (key) {
+    del(this, this[CACHE].get(key))
+  }
+
+  load (arr) {
+    // reset the cache
+    this.reset()
+
+    const now = Date.now()
+    // A previous serialized cache has the most recent items first
+    for (let l = arr.length - 1; l >= 0; l--) {
+      const hit = arr[l]
+      const expiresAt = hit.e || 0
+      if (expiresAt === 0)
+        // the item was created without expiration in a non aged cache
+        this.set(hit.k, hit.v)
+      else {
+        const maxAge = expiresAt - now
+        // dont add already expired items
+        if (maxAge > 0) {
+          this.set(hit.k, hit.v, maxAge)
+        }
+      }
+    }
+  }
+
+  prune () {
+    this[CACHE].forEach((value, key) => get(this, key, false))
+  }
+}
+
+const get = (self, key, doUse) => {
+  const node = self[CACHE].get(key)
+  if (node) {
+    const hit = node.value
+    if (isStale(self, hit)) {
+      del(self, node)
+      if (!self[ALLOW_STALE])
+        return undefined
+    } else {
+      if (doUse) {
+        if (self[UPDATE_AGE_ON_GET])
+          node.value.now = Date.now()
+        self[LRU_LIST].unshiftNode(node)
+      }
+    }
+    return hit.value
+  }
+}
+
+const isStale = (self, hit) => {
+  if (!hit || (!hit.maxAge && !self[MAX_AGE]))
+    return false
+
+  const diff = Date.now() - hit.now
+  return hit.maxAge ? diff > hit.maxAge
+    : self[MAX_AGE] && (diff > self[MAX_AGE])
+}
+
+const trim = self => {
+  if (self[LENGTH] > self[MAX]) {
+    for (let walker = self[LRU_LIST].tail;
+      self[LENGTH] > self[MAX] && walker !== null;) {
+      // We know that we're about to delete this one, and also
+      // what the next least recently used key will be, so just
+      // go ahead and set it now.
+      const prev = walker.prev
+      del(self, walker)
+      walker = prev
+    }
+  }
+}
+
+const del = (self, node) => {
+  if (node) {
+    const hit = node.value
+    if (self[DISPOSE])
+      self[DISPOSE](hit.key, hit.value)
+
+    self[LENGTH] -= hit.length
+    self[CACHE].delete(hit.key)
+    self[LRU_LIST].removeNode(node)
+  }
+}
+
+class Entry {
+  constructor (key, value, length, now, maxAge) {
+    this.key = key
+    this.value = value
+    this.length = length
+    this.now = now
+    this.maxAge = maxAge || 0
+  }
+}
+
+const forEachStep = (self, fn, node, thisp) => {
+  let hit = node.value
+  if (isStale(self, hit)) {
+    del(self, node)
+    if (!self[ALLOW_STALE])
+      hit = undefined
+  }
+  if (hit)
+    fn.call(thisp, hit.value, hit.key, self)
+}
+
+module.exports = LRUCache
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/ms/index.js":
+/*!*******************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/ms/index.js ***!
+  \*******************************************************************/
+/***/ ((module) => {
+
+/**
+ * Helpers.
+ */
+
+var s = 1000;
+var m = s * 60;
+var h = m * 60;
+var d = h * 24;
+var w = d * 7;
+var y = d * 365.25;
+
+/**
+ * Parse or format the given `val`.
+ *
+ * Options:
+ *
+ *  - `long` verbose formatting [false]
+ *
+ * @param {String|Number} val
+ * @param {Object} [options]
+ * @throws {Error} throw an error if val is not a non-empty string or a number
+ * @return {String|Number}
+ * @api public
+ */
+
+module.exports = function(val, options) {
+  options = options || {};
+  var type = typeof val;
+  if (type === 'string' && val.length > 0) {
+    return parse(val);
+  } else if (type === 'number' && isFinite(val)) {
+    return options.long ? fmtLong(val) : fmtShort(val);
+  }
+  throw new Error(
+    'val is not a non-empty string or a valid number. val=' +
+      JSON.stringify(val)
+  );
+};
+
+/**
+ * Parse the given `str` and return milliseconds.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function parse(str) {
+  str = String(str);
+  if (str.length > 100) {
+    return;
+  }
+  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+    str
+  );
+  if (!match) {
+    return;
+  }
+  var n = parseFloat(match[1]);
+  var type = (match[2] || 'ms').toLowerCase();
+  switch (type) {
+    case 'years':
+    case 'year':
+    case 'yrs':
+    case 'yr':
+    case 'y':
+      return n * y;
+    case 'weeks':
+    case 'week':
+    case 'w':
+      return n * w;
+    case 'days':
+    case 'day':
+    case 'd':
+      return n * d;
+    case 'hours':
+    case 'hour':
+    case 'hrs':
+    case 'hr':
+    case 'h':
+      return n * h;
+    case 'minutes':
+    case 'minute':
+    case 'mins':
+    case 'min':
+    case 'm':
+      return n * m;
+    case 'seconds':
+    case 'second':
+    case 'secs':
+    case 'sec':
+    case 's':
+      return n * s;
+    case 'milliseconds':
+    case 'millisecond':
+    case 'msecs':
+    case 'msec':
+    case 'ms':
+      return n;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Short format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtShort(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return Math.round(ms / d) + 'd';
+  }
+  if (msAbs >= h) {
+    return Math.round(ms / h) + 'h';
+  }
+  if (msAbs >= m) {
+    return Math.round(ms / m) + 'm';
+  }
+  if (msAbs >= s) {
+    return Math.round(ms / s) + 's';
+  }
+  return ms + 'ms';
+}
+
+/**
+ * Long format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtLong(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return plural(ms, msAbs, d, 'day');
+  }
+  if (msAbs >= h) {
+    return plural(ms, msAbs, h, 'hour');
+  }
+  if (msAbs >= m) {
+    return plural(ms, msAbs, m, 'minute');
+  }
+  if (msAbs >= s) {
+    return plural(ms, msAbs, s, 'second');
+  }
+  return ms + ' ms';
+}
+
+/**
+ * Pluralization helper.
+ */
+
+function plural(ms, msAbs, n, name) {
+  var isPlural = msAbs >= n * 1.5;
+  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js ***!
+  \************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const ANY = Symbol('SemVer ANY')
+// hoisted class for cyclic dependency
+class Comparator {
+  static get ANY () {
+    return ANY
+  }
+
+  constructor (comp, options) {
+    options = parseOptions(options)
+
+    if (comp instanceof Comparator) {
+      if (comp.loose === !!options.loose) {
+        return comp
+      } else {
+        comp = comp.value
+      }
+    }
+
+    comp = comp.trim().split(/\s+/).join(' ')
+    debug('comparator', comp, options)
+    this.options = options
+    this.loose = !!options.loose
+    this.parse(comp)
+
+    if (this.semver === ANY) {
+      this.value = ''
+    } else {
+      this.value = this.operator + this.semver.version
+    }
+
+    debug('comp', this)
+  }
+
+  parse (comp) {
+    const r = this.options.loose ? re[t.COMPARATORLOOSE] : re[t.COMPARATOR]
+    const m = comp.match(r)
+
+    if (!m) {
+      throw new TypeError(`Invalid comparator: ${comp}`)
+    }
+
+    this.operator = m[1] !== undefined ? m[1] : ''
+    if (this.operator === '=') {
+      this.operator = ''
+    }
+
+    // if it literally is just '>' or '' then allow anything.
+    if (!m[2]) {
+      this.semver = ANY
+    } else {
+      this.semver = new SemVer(m[2], this.options.loose)
+    }
+  }
+
+  toString () {
+    return this.value
+  }
+
+  test (version) {
+    debug('Comparator.test', version, this.options.loose)
+
+    if (this.semver === ANY || version === ANY) {
+      return true
+    }
+
+    if (typeof version === 'string') {
+      try {
+        version = new SemVer(version, this.options)
+      } catch (er) {
+        return false
+      }
+    }
+
+    return cmp(version, this.operator, this.semver, this.options)
+  }
+
+  intersects (comp, options) {
+    if (!(comp instanceof Comparator)) {
+      throw new TypeError('a Comparator is required')
+    }
+
+    if (this.operator === '') {
+      if (this.value === '') {
+        return true
+      }
+      return new Range(comp.value, options).test(this.value)
+    } else if (comp.operator === '') {
+      if (comp.value === '') {
+        return true
+      }
+      return new Range(this.value, options).test(comp.semver)
+    }
+
+    options = parseOptions(options)
+
+    // Special cases where nothing can possibly be lower
+    if (options.includePrerelease &&
+      (this.value === '<0.0.0-0' || comp.value === '<0.0.0-0')) {
+      return false
+    }
+    if (!options.includePrerelease &&
+      (this.value.startsWith('<0.0.0') || comp.value.startsWith('<0.0.0'))) {
+      return false
+    }
+
+    // Same direction increasing (> or >=)
+    if (this.operator.startsWith('>') && comp.operator.startsWith('>')) {
+      return true
+    }
+    // Same direction decreasing (< or <=)
+    if (this.operator.startsWith('<') && comp.operator.startsWith('<')) {
+      return true
+    }
+    // same SemVer and both sides are inclusive (<= or >=)
+    if (
+      (this.semver.version === comp.semver.version) &&
+      this.operator.includes('=') && comp.operator.includes('=')) {
+      return true
+    }
+    // opposite directions less than
+    if (cmp(this.semver, '<', comp.semver, options) &&
+      this.operator.startsWith('>') && comp.operator.startsWith('<')) {
+      return true
+    }
+    // opposite directions greater than
+    if (cmp(this.semver, '>', comp.semver, options) &&
+      this.operator.startsWith('<') && comp.operator.startsWith('>')) {
+      return true
+    }
+    return false
+  }
+}
+
+module.exports = Comparator
+
+const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/parse-options.js")
+const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js")
+const cmp = __webpack_require__(/*! ../functions/cmp */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/cmp.js")
+const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js")
+const SemVer = __webpack_require__(/*! ./semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const Range = __webpack_require__(/*! ./range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+// hoisted class for cyclic dependency
+class Range {
+  constructor (range, options) {
+    options = parseOptions(options)
+
+    if (range instanceof Range) {
+      if (
+        range.loose === !!options.loose &&
+        range.includePrerelease === !!options.includePrerelease
+      ) {
+        return range
+      } else {
+        return new Range(range.raw, options)
+      }
+    }
+
+    if (range instanceof Comparator) {
+      // just put it in the set and return
+      this.raw = range.value
+      this.set = [[range]]
+      this.format()
+      return this
+    }
+
+    this.options = options
+    this.loose = !!options.loose
+    this.includePrerelease = !!options.includePrerelease
+
+    // First reduce all whitespace as much as possible so we do not have to rely
+    // on potentially slow regexes like \s*. This is then stored and used for
+    // future error messages as well.
+    this.raw = range
+      .trim()
+      .split(/\s+/)
+      .join(' ')
+
+    // First, split on ||
+    this.set = this.raw
+      .split('||')
+      // map the range to a 2d array of comparators
+      .map(r => this.parseRange(r.trim()))
+      // throw out any comparator lists that are empty
+      // this generally means that it was not a valid range, which is allowed
+      // in loose mode, but will still throw if the WHOLE range is invalid.
+      .filter(c => c.length)
+
+    if (!this.set.length) {
+      throw new TypeError(`Invalid SemVer Range: ${this.raw}`)
+    }
+
+    // if we have any that are not the null set, throw out null sets.
+    if (this.set.length > 1) {
+      // keep the first one, in case they're all null sets
+      const first = this.set[0]
+      this.set = this.set.filter(c => !isNullSet(c[0]))
+      if (this.set.length === 0) {
+        this.set = [first]
+      } else if (this.set.length > 1) {
+        // if we have any that are *, then the range is just *
+        for (const c of this.set) {
+          if (c.length === 1 && isAny(c[0])) {
+            this.set = [c]
+            break
+          }
+        }
+      }
+    }
+
+    this.format()
+  }
+
+  format () {
+    this.range = this.set
+      .map((comps) => comps.join(' ').trim())
+      .join('||')
+      .trim()
+    return this.range
+  }
+
+  toString () {
+    return this.range
+  }
+
+  parseRange (range) {
+    // memoize range parsing for performance.
+    // this is a very hot path, and fully deterministic.
+    const memoOpts =
+      (this.options.includePrerelease && FLAG_INCLUDE_PRERELEASE) |
+      (this.options.loose && FLAG_LOOSE)
+    const memoKey = memoOpts + ':' + range
+    const cached = cache.get(memoKey)
+    if (cached) {
+      return cached
+    }
+
+    const loose = this.options.loose
+    // `1.2.3 - 1.2.4` => `>=1.2.3 <=1.2.4`
+    const hr = loose ? re[t.HYPHENRANGELOOSE] : re[t.HYPHENRANGE]
+    range = range.replace(hr, hyphenReplace(this.options.includePrerelease))
+    debug('hyphen replace', range)
+
+    // `> 1.2.3 < 1.2.5` => `>1.2.3 <1.2.5`
+    range = range.replace(re[t.COMPARATORTRIM], comparatorTrimReplace)
+    debug('comparator trim', range)
+
+    // `~ 1.2.3` => `~1.2.3`
+    range = range.replace(re[t.TILDETRIM], tildeTrimReplace)
+    debug('tilde trim', range)
+
+    // `^ 1.2.3` => `^1.2.3`
+    range = range.replace(re[t.CARETTRIM], caretTrimReplace)
+    debug('caret trim', range)
+
+    // At this point, the range is completely trimmed and
+    // ready to be split into comparators.
+
+    let rangeList = range
+      .split(' ')
+      .map(comp => parseComparator(comp, this.options))
+      .join(' ')
+      .split(/\s+/)
+      // >=0.0.0 is equivalent to *
+      .map(comp => replaceGTE0(comp, this.options))
+
+    if (loose) {
+      // in loose mode, throw out any that are not valid comparators
+      rangeList = rangeList.filter(comp => {
+        debug('loose invalid filter', comp, this.options)
+        return !!comp.match(re[t.COMPARATORLOOSE])
+      })
+    }
+    debug('range list', rangeList)
+
+    // if any comparators are the null set, then replace with JUST null set
+    // if more than one comparator, remove any * comparators
+    // also, don't include the same comparator more than once
+    const rangeMap = new Map()
+    const comparators = rangeList.map(comp => new Comparator(comp, this.options))
+    for (const comp of comparators) {
+      if (isNullSet(comp)) {
+        return [comp]
+      }
+      rangeMap.set(comp.value, comp)
+    }
+    if (rangeMap.size > 1 && rangeMap.has('')) {
+      rangeMap.delete('')
+    }
+
+    const result = [...rangeMap.values()]
+    cache.set(memoKey, result)
+    return result
+  }
+
+  intersects (range, options) {
+    if (!(range instanceof Range)) {
+      throw new TypeError('a Range is required')
+    }
+
+    return this.set.some((thisComparators) => {
+      return (
+        isSatisfiable(thisComparators, options) &&
+        range.set.some((rangeComparators) => {
+          return (
+            isSatisfiable(rangeComparators, options) &&
+            thisComparators.every((thisComparator) => {
+              return rangeComparators.every((rangeComparator) => {
+                return thisComparator.intersects(rangeComparator, options)
+              })
+            })
+          )
+        })
+      )
+    })
+  }
+
+  // if ANY of the sets match ALL of its comparators, then pass
+  test (version) {
+    if (!version) {
+      return false
+    }
+
+    if (typeof version === 'string') {
+      try {
+        version = new SemVer(version, this.options)
+      } catch (er) {
+        return false
+      }
+    }
+
+    for (let i = 0; i < this.set.length; i++) {
+      if (testSet(this.set[i], version, this.options)) {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+module.exports = Range
+
+const LRU = __webpack_require__(/*! lru-cache */ "./node_modules/@puppeteer/browsers/node_modules/lru-cache/index.js")
+const cache = new LRU({ max: 1000 })
+
+const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/parse-options.js")
+const Comparator = __webpack_require__(/*! ./comparator */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js")
+const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js")
+const SemVer = __webpack_require__(/*! ./semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const {
+  safeRe: re,
+  t,
+  comparatorTrimReplace,
+  tildeTrimReplace,
+  caretTrimReplace,
+} = __webpack_require__(/*! ../internal/re */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js")
+const { FLAG_INCLUDE_PRERELEASE, FLAG_LOOSE } = __webpack_require__(/*! ../internal/constants */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js")
+
+const isNullSet = c => c.value === '<0.0.0-0'
+const isAny = c => c.value === ''
+
+// take a set of comparators and determine whether there
+// exists a version which can satisfy it
+const isSatisfiable = (comparators, options) => {
+  let result = true
+  const remainingComparators = comparators.slice()
+  let testComparator = remainingComparators.pop()
+
+  while (result && remainingComparators.length) {
+    result = remainingComparators.every((otherComparator) => {
+      return testComparator.intersects(otherComparator, options)
+    })
+
+    testComparator = remainingComparators.pop()
+  }
+
+  return result
+}
+
+// comprised of xranges, tildes, stars, and gtlt's at this point.
+// already replaced the hyphen ranges
+// turn into a set of JUST comparators.
+const parseComparator = (comp, options) => {
+  debug('comp', comp, options)
+  comp = replaceCarets(comp, options)
+  debug('caret', comp)
+  comp = replaceTildes(comp, options)
+  debug('tildes', comp)
+  comp = replaceXRanges(comp, options)
+  debug('xrange', comp)
+  comp = replaceStars(comp, options)
+  debug('stars', comp)
+  return comp
+}
+
+const isX = id => !id || id.toLowerCase() === 'x' || id === '*'
+
+// ~, ~> --> * (any, kinda silly)
+// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0 <3.0.0-0
+// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0 <2.1.0-0
+// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0 <1.3.0-0
+// ~1.2.3, ~>1.2.3 --> >=1.2.3 <1.3.0-0
+// ~1.2.0, ~>1.2.0 --> >=1.2.0 <1.3.0-0
+// ~0.0.1 --> >=0.0.1 <0.1.0-0
+const replaceTildes = (comp, options) => {
+  return comp
+    .trim()
+    .split(/\s+/)
+    .map((c) => replaceTilde(c, options))
+    .join(' ')
+}
+
+const replaceTilde = (comp, options) => {
+  const r = options.loose ? re[t.TILDELOOSE] : re[t.TILDE]
+  return comp.replace(r, (_, M, m, p, pr) => {
+    debug('tilde', comp, _, M, m, p, pr)
+    let ret
+
+    if (isX(M)) {
+      ret = ''
+    } else if (isX(m)) {
+      ret = `>=${M}.0.0 <${+M + 1}.0.0-0`
+    } else if (isX(p)) {
+      // ~1.2 == >=1.2.0 <1.3.0-0
+      ret = `>=${M}.${m}.0 <${M}.${+m + 1}.0-0`
+    } else if (pr) {
+      debug('replaceTilde pr', pr)
+      ret = `>=${M}.${m}.${p}-${pr
+      } <${M}.${+m + 1}.0-0`
+    } else {
+      // ~1.2.3 == >=1.2.3 <1.3.0-0
+      ret = `>=${M}.${m}.${p
+      } <${M}.${+m + 1}.0-0`
+    }
+
+    debug('tilde return', ret)
+    return ret
+  })
+}
+
+// ^ --> * (any, kinda silly)
+// ^2, ^2.x, ^2.x.x --> >=2.0.0 <3.0.0-0
+// ^2.0, ^2.0.x --> >=2.0.0 <3.0.0-0
+// ^1.2, ^1.2.x --> >=1.2.0 <2.0.0-0
+// ^1.2.3 --> >=1.2.3 <2.0.0-0
+// ^1.2.0 --> >=1.2.0 <2.0.0-0
+// ^0.0.1 --> >=0.0.1 <0.0.2-0
+// ^0.1.0 --> >=0.1.0 <0.2.0-0
+const replaceCarets = (comp, options) => {
+  return comp
+    .trim()
+    .split(/\s+/)
+    .map((c) => replaceCaret(c, options))
+    .join(' ')
+}
+
+const replaceCaret = (comp, options) => {
+  debug('caret', comp, options)
+  const r = options.loose ? re[t.CARETLOOSE] : re[t.CARET]
+  const z = options.includePrerelease ? '-0' : ''
+  return comp.replace(r, (_, M, m, p, pr) => {
+    debug('caret', comp, _, M, m, p, pr)
+    let ret
+
+    if (isX(M)) {
+      ret = ''
+    } else if (isX(m)) {
+      ret = `>=${M}.0.0${z} <${+M + 1}.0.0-0`
+    } else if (isX(p)) {
+      if (M === '0') {
+        ret = `>=${M}.${m}.0${z} <${M}.${+m + 1}.0-0`
+      } else {
+        ret = `>=${M}.${m}.0${z} <${+M + 1}.0.0-0`
+      }
+    } else if (pr) {
+      debug('replaceCaret pr', pr)
+      if (M === '0') {
+        if (m === '0') {
+          ret = `>=${M}.${m}.${p}-${pr
+          } <${M}.${m}.${+p + 1}-0`
+        } else {
+          ret = `>=${M}.${m}.${p}-${pr
+          } <${M}.${+m + 1}.0-0`
+        }
+      } else {
+        ret = `>=${M}.${m}.${p}-${pr
+        } <${+M + 1}.0.0-0`
+      }
+    } else {
+      debug('no pr')
+      if (M === '0') {
+        if (m === '0') {
+          ret = `>=${M}.${m}.${p
+          }${z} <${M}.${m}.${+p + 1}-0`
+        } else {
+          ret = `>=${M}.${m}.${p
+          }${z} <${M}.${+m + 1}.0-0`
+        }
+      } else {
+        ret = `>=${M}.${m}.${p
+        } <${+M + 1}.0.0-0`
+      }
+    }
+
+    debug('caret return', ret)
+    return ret
+  })
+}
+
+const replaceXRanges = (comp, options) => {
+  debug('replaceXRanges', comp, options)
+  return comp
+    .split(/\s+/)
+    .map((c) => replaceXRange(c, options))
+    .join(' ')
+}
+
+const replaceXRange = (comp, options) => {
+  comp = comp.trim()
+  const r = options.loose ? re[t.XRANGELOOSE] : re[t.XRANGE]
+  return comp.replace(r, (ret, gtlt, M, m, p, pr) => {
+    debug('xRange', comp, ret, gtlt, M, m, p, pr)
+    const xM = isX(M)
+    const xm = xM || isX(m)
+    const xp = xm || isX(p)
+    const anyX = xp
+
+    if (gtlt === '=' && anyX) {
+      gtlt = ''
+    }
+
+    // if we're including prereleases in the match, then we need
+    // to fix this to -0, the lowest possible prerelease value
+    pr = options.includePrerelease ? '-0' : ''
+
+    if (xM) {
+      if (gtlt === '>' || gtlt === '<') {
+        // nothing is allowed
+        ret = '<0.0.0-0'
+      } else {
+        // nothing is forbidden
+        ret = '*'
+      }
+    } else if (gtlt && anyX) {
+      // we know patch is an x, because we have any x at all.
+      // replace X with 0
+      if (xm) {
+        m = 0
+      }
+      p = 0
+
+      if (gtlt === '>') {
+        // >1 => >=2.0.0
+        // >1.2 => >=1.3.0
+        gtlt = '>='
+        if (xm) {
+          M = +M + 1
+          m = 0
+          p = 0
+        } else {
+          m = +m + 1
+          p = 0
+        }
+      } else if (gtlt === '<=') {
+        // <=0.7.x is actually <0.8.0, since any 0.7.x should
+        // pass.  Similarly, <=7.x is actually <8.0.0, etc.
+        gtlt = '<'
+        if (xm) {
+          M = +M + 1
+        } else {
+          m = +m + 1
+        }
+      }
+
+      if (gtlt === '<') {
+        pr = '-0'
+      }
+
+      ret = `${gtlt + M}.${m}.${p}${pr}`
+    } else if (xm) {
+      ret = `>=${M}.0.0${pr} <${+M + 1}.0.0-0`
+    } else if (xp) {
+      ret = `>=${M}.${m}.0${pr
+      } <${M}.${+m + 1}.0-0`
+    }
+
+    debug('xRange return', ret)
+
+    return ret
+  })
+}
+
+// Because * is AND-ed with everything else in the comparator,
+// and '' means "any version", just remove the *s entirely.
+const replaceStars = (comp, options) => {
+  debug('replaceStars', comp, options)
+  // Looseness is ignored here.  star is always as loose as it gets!
+  return comp
+    .trim()
+    .replace(re[t.STAR], '')
+}
+
+const replaceGTE0 = (comp, options) => {
+  debug('replaceGTE0', comp, options)
+  return comp
+    .trim()
+    .replace(re[options.includePrerelease ? t.GTE0PRE : t.GTE0], '')
+}
+
+// This function is passed to string.replace(re[t.HYPHENRANGE])
+// M, m, patch, prerelease, build
+// 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
+// 1.2.3 - 3.4 => >=1.2.0 <3.5.0-0 Any 3.4.x will do
+// 1.2 - 3.4 => >=1.2.0 <3.5.0-0
+const hyphenReplace = incPr => ($0,
+  from, fM, fm, fp, fpr, fb,
+  to, tM, tm, tp, tpr, tb) => {
+  if (isX(fM)) {
+    from = ''
+  } else if (isX(fm)) {
+    from = `>=${fM}.0.0${incPr ? '-0' : ''}`
+  } else if (isX(fp)) {
+    from = `>=${fM}.${fm}.0${incPr ? '-0' : ''}`
+  } else if (fpr) {
+    from = `>=${from}`
+  } else {
+    from = `>=${from}${incPr ? '-0' : ''}`
+  }
+
+  if (isX(tM)) {
+    to = ''
+  } else if (isX(tm)) {
+    to = `<${+tM + 1}.0.0-0`
+  } else if (isX(tp)) {
+    to = `<${tM}.${+tm + 1}.0-0`
+  } else if (tpr) {
+    to = `<=${tM}.${tm}.${tp}-${tpr}`
+  } else if (incPr) {
+    to = `<${tM}.${tm}.${+tp + 1}-0`
+  } else {
+    to = `<=${to}`
+  }
+
+  return `${from} ${to}`.trim()
+}
+
+const testSet = (set, version, options) => {
+  for (let i = 0; i < set.length; i++) {
+    if (!set[i].test(version)) {
+      return false
+    }
+  }
+
+  if (version.prerelease.length && !options.includePrerelease) {
+    // Find the set of versions that are allowed to have prereleases
+    // For example, ^1.2.3-pr.1 desugars to >=1.2.3-pr.1 <2.0.0
+    // That should allow `1.2.3-pr.2` to pass.
+    // However, `1.2.4-alpha.notready` should NOT be allowed,
+    // even though it's within the range set by the comparators.
+    for (let i = 0; i < set.length; i++) {
+      debug(set[i].semver)
+      if (set[i].semver === Comparator.ANY) {
+        continue
+      }
+
+      if (set[i].semver.prerelease.length > 0) {
+        const allowed = set[i].semver
+        if (allowed.major === version.major &&
+            allowed.minor === version.minor &&
+            allowed.patch === version.patch) {
+          return true
+        }
+      }
+    }
+
+    // Version has a -pre, but it's not one of the ones we like.
+    return false
+  }
+
+  return true
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js ***!
+  \********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js")
+const { MAX_LENGTH, MAX_SAFE_INTEGER } = __webpack_require__(/*! ../internal/constants */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js")
+const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js")
+
+const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/parse-options.js")
+const { compareIdentifiers } = __webpack_require__(/*! ../internal/identifiers */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/identifiers.js")
+class SemVer {
+  constructor (version, options) {
+    options = parseOptions(options)
+
+    if (version instanceof SemVer) {
+      if (version.loose === !!options.loose &&
+          version.includePrerelease === !!options.includePrerelease) {
+        return version
+      } else {
+        version = version.version
+      }
+    } else if (typeof version !== 'string') {
+      throw new TypeError(`Invalid version. Must be a string. Got type "${typeof version}".`)
+    }
+
+    if (version.length > MAX_LENGTH) {
+      throw new TypeError(
+        `version is longer than ${MAX_LENGTH} characters`
+      )
+    }
+
+    debug('SemVer', version, options)
+    this.options = options
+    this.loose = !!options.loose
+    // this isn't actually relevant for versions, but keep it so that we
+    // don't run into trouble passing this.options around.
+    this.includePrerelease = !!options.includePrerelease
+
+    const m = version.trim().match(options.loose ? re[t.LOOSE] : re[t.FULL])
+
+    if (!m) {
+      throw new TypeError(`Invalid Version: ${version}`)
+    }
+
+    this.raw = version
+
+    // these are actually numbers
+    this.major = +m[1]
+    this.minor = +m[2]
+    this.patch = +m[3]
+
+    if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
+      throw new TypeError('Invalid major version')
+    }
+
+    if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
+      throw new TypeError('Invalid minor version')
+    }
+
+    if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
+      throw new TypeError('Invalid patch version')
+    }
+
+    // numberify any prerelease numeric ids
+    if (!m[4]) {
+      this.prerelease = []
+    } else {
+      this.prerelease = m[4].split('.').map((id) => {
+        if (/^[0-9]+$/.test(id)) {
+          const num = +id
+          if (num >= 0 && num < MAX_SAFE_INTEGER) {
+            return num
+          }
+        }
+        return id
+      })
+    }
+
+    this.build = m[5] ? m[5].split('.') : []
+    this.format()
+  }
+
+  format () {
+    this.version = `${this.major}.${this.minor}.${this.patch}`
+    if (this.prerelease.length) {
+      this.version += `-${this.prerelease.join('.')}`
+    }
+    return this.version
+  }
+
+  toString () {
+    return this.version
+  }
+
+  compare (other) {
+    debug('SemVer.compare', this.version, this.options, other)
+    if (!(other instanceof SemVer)) {
+      if (typeof other === 'string' && other === this.version) {
+        return 0
+      }
+      other = new SemVer(other, this.options)
+    }
+
+    if (other.version === this.version) {
+      return 0
+    }
+
+    return this.compareMain(other) || this.comparePre(other)
+  }
+
+  compareMain (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    return (
+      compareIdentifiers(this.major, other.major) ||
+      compareIdentifiers(this.minor, other.minor) ||
+      compareIdentifiers(this.patch, other.patch)
+    )
+  }
+
+  comparePre (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    // NOT having a prerelease is > having one
+    if (this.prerelease.length && !other.prerelease.length) {
+      return -1
+    } else if (!this.prerelease.length && other.prerelease.length) {
+      return 1
+    } else if (!this.prerelease.length && !other.prerelease.length) {
+      return 0
+    }
+
+    let i = 0
+    do {
+      const a = this.prerelease[i]
+      const b = other.prerelease[i]
+      debug('prerelease compare', i, a, b)
+      if (a === undefined && b === undefined) {
+        return 0
+      } else if (b === undefined) {
+        return 1
+      } else if (a === undefined) {
+        return -1
+      } else if (a === b) {
+        continue
+      } else {
+        return compareIdentifiers(a, b)
+      }
+    } while (++i)
+  }
+
+  compareBuild (other) {
+    if (!(other instanceof SemVer)) {
+      other = new SemVer(other, this.options)
+    }
+
+    let i = 0
+    do {
+      const a = this.build[i]
+      const b = other.build[i]
+      debug('prerelease compare', i, a, b)
+      if (a === undefined && b === undefined) {
+        return 0
+      } else if (b === undefined) {
+        return 1
+      } else if (a === undefined) {
+        return -1
+      } else if (a === b) {
+        continue
+      } else {
+        return compareIdentifiers(a, b)
+      }
+    } while (++i)
+  }
+
+  // preminor will bump the version up to the next minor release, and immediately
+  // down to pre-release. premajor and prepatch work the same way.
+  inc (release, identifier, identifierBase) {
+    switch (release) {
+      case 'premajor':
+        this.prerelease.length = 0
+        this.patch = 0
+        this.minor = 0
+        this.major++
+        this.inc('pre', identifier, identifierBase)
+        break
+      case 'preminor':
+        this.prerelease.length = 0
+        this.patch = 0
+        this.minor++
+        this.inc('pre', identifier, identifierBase)
+        break
+      case 'prepatch':
+        // If this is already a prerelease, it will bump to the next version
+        // drop any prereleases that might already exist, since they are not
+        // relevant at this point.
+        this.prerelease.length = 0
+        this.inc('patch', identifier, identifierBase)
+        this.inc('pre', identifier, identifierBase)
+        break
+      // If the input is a non-prerelease version, this acts the same as
+      // prepatch.
+      case 'prerelease':
+        if (this.prerelease.length === 0) {
+          this.inc('patch', identifier, identifierBase)
+        }
+        this.inc('pre', identifier, identifierBase)
+        break
+
+      case 'major':
+        // If this is a pre-major version, bump up to the same major version.
+        // Otherwise increment major.
+        // 1.0.0-5 bumps to 1.0.0
+        // 1.1.0 bumps to 2.0.0
+        if (
+          this.minor !== 0 ||
+          this.patch !== 0 ||
+          this.prerelease.length === 0
+        ) {
+          this.major++
+        }
+        this.minor = 0
+        this.patch = 0
+        this.prerelease = []
+        break
+      case 'minor':
+        // If this is a pre-minor version, bump up to the same minor version.
+        // Otherwise increment minor.
+        // 1.2.0-5 bumps to 1.2.0
+        // 1.2.1 bumps to 1.3.0
+        if (this.patch !== 0 || this.prerelease.length === 0) {
+          this.minor++
+        }
+        this.patch = 0
+        this.prerelease = []
+        break
+      case 'patch':
+        // If this is not a pre-release version, it will increment the patch.
+        // If it is a pre-release it will bump up to the same patch version.
+        // 1.2.0-5 patches to 1.2.0
+        // 1.2.0 patches to 1.2.1
+        if (this.prerelease.length === 0) {
+          this.patch++
+        }
+        this.prerelease = []
+        break
+      // This probably shouldn't be used publicly.
+      // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
+      case 'pre': {
+        const base = Number(identifierBase) ? 1 : 0
+
+        if (!identifier && identifierBase === false) {
+          throw new Error('invalid increment argument: identifier is empty')
+        }
+
+        if (this.prerelease.length === 0) {
+          this.prerelease = [base]
+        } else {
+          let i = this.prerelease.length
+          while (--i >= 0) {
+            if (typeof this.prerelease[i] === 'number') {
+              this.prerelease[i]++
+              i = -2
+            }
+          }
+          if (i === -1) {
+            // didn't increment anything
+            if (identifier === this.prerelease.join('.') && identifierBase === false) {
+              throw new Error('invalid increment argument: identifier already exists')
+            }
+            this.prerelease.push(base)
+          }
+        }
+        if (identifier) {
+          // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
+          // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
+          let prerelease = [identifier, base]
+          if (identifierBase === false) {
+            prerelease = [identifier]
+          }
+          if (compareIdentifiers(this.prerelease[0], identifier) === 0) {
+            if (isNaN(this.prerelease[1])) {
+              this.prerelease = prerelease
+            }
+          } else {
+            this.prerelease = prerelease
+          }
+        }
+        break
+      }
+      default:
+        throw new Error(`invalid increment argument: ${release}`)
+    }
+    this.raw = this.format()
+    if (this.build.length) {
+      this.raw += `+${this.build.join('.')}`
+    }
+    return this
+  }
+}
+
+module.exports = SemVer
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/clean.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/clean.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const parse = __webpack_require__(/*! ./parse */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+const clean = (version, options) => {
+  const s = parse(version.trim().replace(/^[=v]+/, ''), options)
+  return s ? s.version : null
+}
+module.exports = clean
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/cmp.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/cmp.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const eq = __webpack_require__(/*! ./eq */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/eq.js")
+const neq = __webpack_require__(/*! ./neq */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/neq.js")
+const gt = __webpack_require__(/*! ./gt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js")
+const gte = __webpack_require__(/*! ./gte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gte.js")
+const lt = __webpack_require__(/*! ./lt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lt.js")
+const lte = __webpack_require__(/*! ./lte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lte.js")
+
+const cmp = (a, op, b, loose) => {
+  switch (op) {
+    case '===':
+      if (typeof a === 'object') {
+        a = a.version
+      }
+      if (typeof b === 'object') {
+        b = b.version
+      }
+      return a === b
+
+    case '!==':
+      if (typeof a === 'object') {
+        a = a.version
+      }
+      if (typeof b === 'object') {
+        b = b.version
+      }
+      return a !== b
+
+    case '':
+    case '=':
+    case '==':
+      return eq(a, b, loose)
+
+    case '!=':
+      return neq(a, b, loose)
+
+    case '>':
+      return gt(a, b, loose)
+
+    case '>=':
+      return gte(a, b, loose)
+
+    case '<':
+      return lt(a, b, loose)
+
+    case '<=':
+      return lte(a, b, loose)
+
+    default:
+      throw new TypeError(`Invalid operator: ${op}`)
+  }
+}
+module.exports = cmp
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/coerce.js":
+/*!**********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/coerce.js ***!
+  \**********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const parse = __webpack_require__(/*! ./parse */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js")
+
+const coerce = (version, options) => {
+  if (version instanceof SemVer) {
+    return version
+  }
+
+  if (typeof version === 'number') {
+    version = String(version)
+  }
+
+  if (typeof version !== 'string') {
+    return null
+  }
+
+  options = options || {}
+
+  let match = null
+  if (!options.rtl) {
+    match = version.match(options.includePrerelease ? re[t.COERCEFULL] : re[t.COERCE])
+  } else {
+    // Find the right-most coercible string that does not share
+    // a terminus with a more left-ward coercible string.
+    // Eg, '1.2.3.4' wants to coerce '2.3.4', not '3.4' or '4'
+    // With includePrerelease option set, '1.2.3.4-rc' wants to coerce '2.3.4-rc', not '2.3.4'
+    //
+    // Walk through the string checking with a /g regexp
+    // Manually set the index so as to pick up overlapping matches.
+    // Stop when we get a match that ends at the string end, since no
+    // coercible string can be more right-ward without the same terminus.
+    const coerceRtlRegex = options.includePrerelease ? re[t.COERCERTLFULL] : re[t.COERCERTL]
+    let next
+    while ((next = coerceRtlRegex.exec(version)) &&
+        (!match || match.index + match[0].length !== version.length)
+    ) {
+      if (!match ||
+            next.index + next[0].length !== match.index + match[0].length) {
+        match = next
+      }
+      coerceRtlRegex.lastIndex = next.index + next[1].length + next[2].length
+    }
+    // leave it in a clean state
+    coerceRtlRegex.lastIndex = -1
+  }
+
+  if (match === null) {
+    return null
+  }
+
+  const major = match[2]
+  const minor = match[3] || '0'
+  const patch = match[4] || '0'
+  const prerelease = options.includePrerelease && match[5] ? `-${match[5]}` : ''
+  const build = options.includePrerelease && match[6] ? `+${match[6]}` : ''
+
+  return parse(`${major}.${minor}.${patch}${prerelease}${build}`, options)
+}
+module.exports = coerce
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-build.js":
+/*!*****************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-build.js ***!
+  \*****************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const compareBuild = (a, b, loose) => {
+  const versionA = new SemVer(a, loose)
+  const versionB = new SemVer(b, loose)
+  return versionA.compare(versionB) || versionA.compareBuild(versionB)
+}
+module.exports = compareBuild
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-loose.js":
+/*!*****************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-loose.js ***!
+  \*****************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const compareLoose = (a, b) => compare(a, b, true)
+module.exports = compareLoose
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js":
+/*!***********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js ***!
+  \***********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const compare = (a, b, loose) =>
+  new SemVer(a, loose).compare(new SemVer(b, loose))
+
+module.exports = compare
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/diff.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/diff.js ***!
+  \********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const parse = __webpack_require__(/*! ./parse.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+
+const diff = (version1, version2) => {
+  const v1 = parse(version1, null, true)
+  const v2 = parse(version2, null, true)
+  const comparison = v1.compare(v2)
+
+  if (comparison === 0) {
+    return null
+  }
+
+  const v1Higher = comparison > 0
+  const highVersion = v1Higher ? v1 : v2
+  const lowVersion = v1Higher ? v2 : v1
+  const highHasPre = !!highVersion.prerelease.length
+  const lowHasPre = !!lowVersion.prerelease.length
+
+  if (lowHasPre && !highHasPre) {
+    // Going from prerelease -> no prerelease requires some special casing
+
+    // If the low version has only a major, then it will always be a major
+    // Some examples:
+    // 1.0.0-1 -> 1.0.0
+    // 1.0.0-1 -> 1.1.1
+    // 1.0.0-1 -> 2.0.0
+    if (!lowVersion.patch && !lowVersion.minor) {
+      return 'major'
+    }
+
+    // Otherwise it can be determined by checking the high version
+
+    if (highVersion.patch) {
+      // anything higher than a patch bump would result in the wrong version
+      return 'patch'
+    }
+
+    if (highVersion.minor) {
+      // anything higher than a minor bump would result in the wrong version
+      return 'minor'
+    }
+
+    // bumping major/minor/patch all have same result
+    return 'major'
+  }
+
+  // add the `pre` prefix if we are going to a prerelease version
+  const prefix = highHasPre ? 'pre' : ''
+
+  if (v1.major !== v2.major) {
+    return prefix + 'major'
+  }
+
+  if (v1.minor !== v2.minor) {
+    return prefix + 'minor'
+  }
+
+  if (v1.patch !== v2.patch) {
+    return prefix + 'patch'
+  }
+
+  // high and low are preleases
+  return 'prerelease'
+}
+
+module.exports = diff
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/eq.js":
+/*!******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/eq.js ***!
+  \******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const eq = (a, b, loose) => compare(a, b, loose) === 0
+module.exports = eq
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js":
+/*!******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js ***!
+  \******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const gt = (a, b, loose) => compare(a, b, loose) > 0
+module.exports = gt
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gte.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/gte.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const gte = (a, b, loose) => compare(a, b, loose) >= 0
+module.exports = gte
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/inc.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/inc.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+
+const inc = (version, release, options, identifier, identifierBase) => {
+  if (typeof (options) === 'string') {
+    identifierBase = identifier
+    identifier = options
+    options = undefined
+  }
+
+  try {
+    return new SemVer(
+      version instanceof SemVer ? version.version : version,
+      options
+    ).inc(release, identifier, identifierBase).version
+  } catch (er) {
+    return null
+  }
+}
+module.exports = inc
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lt.js":
+/*!******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/lt.js ***!
+  \******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const lt = (a, b, loose) => compare(a, b, loose) < 0
+module.exports = lt
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lte.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/lte.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const lte = (a, b, loose) => compare(a, b, loose) <= 0
+module.exports = lte
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/major.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/major.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const major = (a, loose) => new SemVer(a, loose).major
+module.exports = major
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/minor.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/minor.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const minor = (a, loose) => new SemVer(a, loose).minor
+module.exports = minor
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/neq.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/neq.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const neq = (a, b, loose) => compare(a, b, loose) !== 0
+module.exports = neq
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const parse = (version, options, throwErrors = false) => {
+  if (version instanceof SemVer) {
+    return version
+  }
+  try {
+    return new SemVer(version, options)
+  } catch (er) {
+    if (!throwErrors) {
+      return null
+    }
+    throw er
+  }
+}
+
+module.exports = parse
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/patch.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/patch.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const patch = (a, loose) => new SemVer(a, loose).patch
+module.exports = patch
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/prerelease.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/prerelease.js ***!
+  \**************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const parse = __webpack_require__(/*! ./parse */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+const prerelease = (version, options) => {
+  const parsed = parse(version, options)
+  return (parsed && parsed.prerelease.length) ? parsed.prerelease : null
+}
+module.exports = prerelease
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/rcompare.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/rcompare.js ***!
+  \************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compare = __webpack_require__(/*! ./compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const rcompare = (a, b, loose) => compare(b, a, loose)
+module.exports = rcompare
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/rsort.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/rsort.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compareBuild = __webpack_require__(/*! ./compare-build */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-build.js")
+const rsort = (list, loose) => list.sort((a, b) => compareBuild(b, a, loose))
+module.exports = rsort
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js":
+/*!*************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js ***!
+  \*************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const satisfies = (version, range, options) => {
+  try {
+    range = new Range(range, options)
+  } catch (er) {
+    return false
+  }
+  return range.test(version)
+}
+module.exports = satisfies
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/sort.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/sort.js ***!
+  \********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const compareBuild = __webpack_require__(/*! ./compare-build */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-build.js")
+const sort = (list, loose) => list.sort((a, b) => compareBuild(a, b, loose))
+module.exports = sort
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/valid.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/functions/valid.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const parse = __webpack_require__(/*! ./parse */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+const valid = (version, options) => {
+  const v = parse(version, options)
+  return v ? v.version : null
+}
+module.exports = valid
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/index.js":
+/*!***********************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/index.js ***!
+  \***********************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+// just pre-load all the stuff that index.js lazily exports
+const internalRe = __webpack_require__(/*! ./internal/re */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js")
+const constants = __webpack_require__(/*! ./internal/constants */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js")
+const SemVer = __webpack_require__(/*! ./classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const identifiers = __webpack_require__(/*! ./internal/identifiers */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/identifiers.js")
+const parse = __webpack_require__(/*! ./functions/parse */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/parse.js")
+const valid = __webpack_require__(/*! ./functions/valid */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/valid.js")
+const clean = __webpack_require__(/*! ./functions/clean */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/clean.js")
+const inc = __webpack_require__(/*! ./functions/inc */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/inc.js")
+const diff = __webpack_require__(/*! ./functions/diff */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/diff.js")
+const major = __webpack_require__(/*! ./functions/major */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/major.js")
+const minor = __webpack_require__(/*! ./functions/minor */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/minor.js")
+const patch = __webpack_require__(/*! ./functions/patch */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/patch.js")
+const prerelease = __webpack_require__(/*! ./functions/prerelease */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/prerelease.js")
+const compare = __webpack_require__(/*! ./functions/compare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+const rcompare = __webpack_require__(/*! ./functions/rcompare */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/rcompare.js")
+const compareLoose = __webpack_require__(/*! ./functions/compare-loose */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-loose.js")
+const compareBuild = __webpack_require__(/*! ./functions/compare-build */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare-build.js")
+const sort = __webpack_require__(/*! ./functions/sort */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/sort.js")
+const rsort = __webpack_require__(/*! ./functions/rsort */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/rsort.js")
+const gt = __webpack_require__(/*! ./functions/gt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js")
+const lt = __webpack_require__(/*! ./functions/lt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lt.js")
+const eq = __webpack_require__(/*! ./functions/eq */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/eq.js")
+const neq = __webpack_require__(/*! ./functions/neq */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/neq.js")
+const gte = __webpack_require__(/*! ./functions/gte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gte.js")
+const lte = __webpack_require__(/*! ./functions/lte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lte.js")
+const cmp = __webpack_require__(/*! ./functions/cmp */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/cmp.js")
+const coerce = __webpack_require__(/*! ./functions/coerce */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/coerce.js")
+const Comparator = __webpack_require__(/*! ./classes/comparator */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js")
+const Range = __webpack_require__(/*! ./classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const satisfies = __webpack_require__(/*! ./functions/satisfies */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js")
+const toComparators = __webpack_require__(/*! ./ranges/to-comparators */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/to-comparators.js")
+const maxSatisfying = __webpack_require__(/*! ./ranges/max-satisfying */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/max-satisfying.js")
+const minSatisfying = __webpack_require__(/*! ./ranges/min-satisfying */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-satisfying.js")
+const minVersion = __webpack_require__(/*! ./ranges/min-version */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-version.js")
+const validRange = __webpack_require__(/*! ./ranges/valid */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/valid.js")
+const outside = __webpack_require__(/*! ./ranges/outside */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/outside.js")
+const gtr = __webpack_require__(/*! ./ranges/gtr */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/gtr.js")
+const ltr = __webpack_require__(/*! ./ranges/ltr */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/ltr.js")
+const intersects = __webpack_require__(/*! ./ranges/intersects */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/intersects.js")
+const simplifyRange = __webpack_require__(/*! ./ranges/simplify */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/simplify.js")
+const subset = __webpack_require__(/*! ./ranges/subset */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/subset.js")
+module.exports = {
+  parse,
+  valid,
+  clean,
+  inc,
+  diff,
+  major,
+  minor,
+  patch,
+  prerelease,
+  compare,
+  rcompare,
+  compareLoose,
+  compareBuild,
+  sort,
+  rsort,
+  gt,
+  lt,
+  eq,
+  neq,
+  gte,
+  lte,
+  cmp,
+  coerce,
+  Comparator,
+  Range,
+  satisfies,
+  toComparators,
+  maxSatisfying,
+  minSatisfying,
+  minVersion,
+  validRange,
+  outside,
+  gtr,
+  ltr,
+  intersects,
+  simplifyRange,
+  subset,
+  SemVer,
+  re: internalRe.re,
+  src: internalRe.src,
+  tokens: internalRe.t,
+  SEMVER_SPEC_VERSION: constants.SEMVER_SPEC_VERSION,
+  RELEASE_TYPES: constants.RELEASE_TYPES,
+  compareIdentifiers: identifiers.compareIdentifiers,
+  rcompareIdentifiers: identifiers.rcompareIdentifiers,
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js ***!
+  \************************************************************************************/
+/***/ ((module) => {
+
+// Note: this is the semver.org version of the spec that it implements
+// Not necessarily the package version of this code.
+const SEMVER_SPEC_VERSION = '2.0.0'
+
+const MAX_LENGTH = 256
+const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
+/* istanbul ignore next */ 9007199254740991
+
+// Max safe segment length for coercion.
+const MAX_SAFE_COMPONENT_LENGTH = 16
+
+// Max safe length for a build identifier. The max length minus 6 characters for
+// the shortest version with a build 0.0.0+BUILD.
+const MAX_SAFE_BUILD_LENGTH = MAX_LENGTH - 6
+
+const RELEASE_TYPES = [
+  'major',
+  'premajor',
+  'minor',
+  'preminor',
+  'patch',
+  'prepatch',
+  'prerelease',
+]
+
+module.exports = {
+  MAX_LENGTH,
+  MAX_SAFE_COMPONENT_LENGTH,
+  MAX_SAFE_BUILD_LENGTH,
+  MAX_SAFE_INTEGER,
+  RELEASE_TYPES,
+  SEMVER_SPEC_VERSION,
+  FLAG_INCLUDE_PRERELEASE: 0b001,
+  FLAG_LOOSE: 0b010,
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js ***!
+  \********************************************************************************/
+/***/ ((module) => {
+
+const debug = (
+  typeof process === 'object' &&
+  process.env &&
+  process.env.NODE_DEBUG &&
+  /\bsemver\b/i.test(process.env.NODE_DEBUG)
+) ? (...args) => console.error('SEMVER', ...args)
+  : () => {}
+
+module.exports = debug
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/identifiers.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/internal/identifiers.js ***!
+  \**************************************************************************************/
+/***/ ((module) => {
+
+const numeric = /^[0-9]+$/
+const compareIdentifiers = (a, b) => {
+  const anum = numeric.test(a)
+  const bnum = numeric.test(b)
+
+  if (anum && bnum) {
+    a = +a
+    b = +b
+  }
+
+  return a === b ? 0
+    : (anum && !bnum) ? -1
+    : (bnum && !anum) ? 1
+    : a < b ? -1
+    : 1
+}
+
+const rcompareIdentifiers = (a, b) => compareIdentifiers(b, a)
+
+module.exports = {
+  compareIdentifiers,
+  rcompareIdentifiers,
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/parse-options.js":
+/*!****************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/internal/parse-options.js ***!
+  \****************************************************************************************/
+/***/ ((module) => {
+
+// parse out just the options we care about
+const looseOption = Object.freeze({ loose: true })
+const emptyOpts = Object.freeze({ })
+const parseOptions = options => {
+  if (!options) {
+    return emptyOpts
+  }
+
+  if (typeof options !== 'object') {
+    return looseOption
+  }
+
+  return options
+}
+module.exports = parseOptions
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js":
+/*!*****************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/internal/re.js ***!
+  \*****************************************************************************/
+/***/ ((module, exports, __webpack_require__) => {
+
+const {
+  MAX_SAFE_COMPONENT_LENGTH,
+  MAX_SAFE_BUILD_LENGTH,
+  MAX_LENGTH,
+} = __webpack_require__(/*! ./constants */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/constants.js")
+const debug = __webpack_require__(/*! ./debug */ "./node_modules/@puppeteer/browsers/node_modules/semver/internal/debug.js")
+exports = module.exports = {}
+
+// The actual regexps go on exports.re
+const re = exports.re = []
+const safeRe = exports.safeRe = []
+const src = exports.src = []
+const t = exports.t = {}
+let R = 0
+
+const LETTERDASHNUMBER = '[a-zA-Z0-9-]'
+
+// Replace some greedy regex tokens to prevent regex dos issues. These regex are
+// used internally via the safeRe object since all inputs in this library get
+// normalized first to trim and collapse all extra whitespace. The original
+// regexes are exported for userland consumption and lower level usage. A
+// future breaking change could export the safer regex only with a note that
+// all input should have extra whitespace removed.
+const safeRegexReplacements = [
+  ['\\s', 1],
+  ['\\d', MAX_LENGTH],
+  [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH],
+]
+
+const makeSafeRegex = (value) => {
+  for (const [token, max] of safeRegexReplacements) {
+    value = value
+      .split(`${token}*`).join(`${token}{0,${max}}`)
+      .split(`${token}+`).join(`${token}{1,${max}}`)
+  }
+  return value
+}
+
+const createToken = (name, value, isGlobal) => {
+  const safe = makeSafeRegex(value)
+  const index = R++
+  debug(name, index, value)
+  t[name] = index
+  src[index] = value
+  re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
+  safeRe[index] = new RegExp(safe, isGlobal ? 'g' : undefined)
+}
+
+// The following Regular Expressions can be used for tokenizing,
+// validating, and parsing SemVer version strings.
+
+// ## Numeric Identifier
+// A single `0`, or a non-zero digit followed by zero or more digits.
+
+createToken('NUMERICIDENTIFIER', '0|[1-9]\\d*')
+createToken('NUMERICIDENTIFIERLOOSE', '\\d+')
+
+// ## Non-numeric Identifier
+// Zero or more digits, followed by a letter or hyphen, and then zero or
+// more letters, digits, or hyphens.
+
+createToken('NONNUMERICIDENTIFIER', `\\d*[a-zA-Z-]${LETTERDASHNUMBER}*`)
+
+// ## Main Version
+// Three dot-separated numeric identifiers.
+
+createToken('MAINVERSION', `(${src[t.NUMERICIDENTIFIER]})\\.` +
+                   `(${src[t.NUMERICIDENTIFIER]})\\.` +
+                   `(${src[t.NUMERICIDENTIFIER]})`)
+
+createToken('MAINVERSIONLOOSE', `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
+                        `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
+                        `(${src[t.NUMERICIDENTIFIERLOOSE]})`)
+
+// ## Pre-release Version Identifier
+// A numeric identifier, or a non-numeric identifier.
+
+createToken('PRERELEASEIDENTIFIER', `(?:${src[t.NUMERICIDENTIFIER]
+}|${src[t.NONNUMERICIDENTIFIER]})`)
+
+createToken('PRERELEASEIDENTIFIERLOOSE', `(?:${src[t.NUMERICIDENTIFIERLOOSE]
+}|${src[t.NONNUMERICIDENTIFIER]})`)
+
+// ## Pre-release Version
+// Hyphen, followed by one or more dot-separated pre-release version
+// identifiers.
+
+createToken('PRERELEASE', `(?:-(${src[t.PRERELEASEIDENTIFIER]
+}(?:\\.${src[t.PRERELEASEIDENTIFIER]})*))`)
+
+createToken('PRERELEASELOOSE', `(?:-?(${src[t.PRERELEASEIDENTIFIERLOOSE]
+}(?:\\.${src[t.PRERELEASEIDENTIFIERLOOSE]})*))`)
+
+// ## Build Metadata Identifier
+// Any combination of digits, letters, or hyphens.
+
+createToken('BUILDIDENTIFIER', `${LETTERDASHNUMBER}+`)
+
+// ## Build Metadata
+// Plus sign, followed by one or more period-separated build metadata
+// identifiers.
+
+createToken('BUILD', `(?:\\+(${src[t.BUILDIDENTIFIER]
+}(?:\\.${src[t.BUILDIDENTIFIER]})*))`)
+
+// ## Full Version String
+// A main version, followed optionally by a pre-release version and
+// build metadata.
+
+// Note that the only major, minor, patch, and pre-release sections of
+// the version string are capturing groups.  The build metadata is not a
+// capturing group, because it should not ever be used in version
+// comparison.
+
+createToken('FULLPLAIN', `v?${src[t.MAINVERSION]
+}${src[t.PRERELEASE]}?${
+  src[t.BUILD]}?`)
+
+createToken('FULL', `^${src[t.FULLPLAIN]}$`)
+
+// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
+// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
+// common in the npm registry.
+createToken('LOOSEPLAIN', `[v=\\s]*${src[t.MAINVERSIONLOOSE]
+}${src[t.PRERELEASELOOSE]}?${
+  src[t.BUILD]}?`)
+
+createToken('LOOSE', `^${src[t.LOOSEPLAIN]}$`)
+
+createToken('GTLT', '((?:<|>)?=?)')
+
+// Something like "2.*" or "1.2.x".
+// Note that "x.x" is a valid xRange identifer, meaning "any version"
+// Only the first item is strictly required.
+createToken('XRANGEIDENTIFIERLOOSE', `${src[t.NUMERICIDENTIFIERLOOSE]}|x|X|\\*`)
+createToken('XRANGEIDENTIFIER', `${src[t.NUMERICIDENTIFIER]}|x|X|\\*`)
+
+createToken('XRANGEPLAIN', `[v=\\s]*(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
+                   `(?:${src[t.PRERELEASE]})?${
+                     src[t.BUILD]}?` +
+                   `)?)?`)
+
+createToken('XRANGEPLAINLOOSE', `[v=\\s]*(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
+                        `(?:${src[t.PRERELEASELOOSE]})?${
+                          src[t.BUILD]}?` +
+                        `)?)?`)
+
+createToken('XRANGE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAIN]}$`)
+createToken('XRANGELOOSE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAINLOOSE]}$`)
+
+// Coercion.
+// Extract anything that could conceivably be a part of a valid semver
+createToken('COERCEPLAIN', `${'(^|[^\\d])' +
+              '(\\d{1,'}${MAX_SAFE_COMPONENT_LENGTH}})` +
+              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?` +
+              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?`)
+createToken('COERCE', `${src[t.COERCEPLAIN]}(?:$|[^\\d])`)
+createToken('COERCEFULL', src[t.COERCEPLAIN] +
+              `(?:${src[t.PRERELEASE]})?` +
+              `(?:${src[t.BUILD]})?` +
+              `(?:$|[^\\d])`)
+createToken('COERCERTL', src[t.COERCE], true)
+createToken('COERCERTLFULL', src[t.COERCEFULL], true)
+
+// Tilde ranges.
+// Meaning is "reasonably at or greater than"
+createToken('LONETILDE', '(?:~>?)')
+
+createToken('TILDETRIM', `(\\s*)${src[t.LONETILDE]}\\s+`, true)
+exports.tildeTrimReplace = '$1~'
+
+createToken('TILDE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAIN]}$`)
+createToken('TILDELOOSE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAINLOOSE]}$`)
+
+// Caret ranges.
+// Meaning is "at least and backwards compatible with"
+createToken('LONECARET', '(?:\\^)')
+
+createToken('CARETTRIM', `(\\s*)${src[t.LONECARET]}\\s+`, true)
+exports.caretTrimReplace = '$1^'
+
+createToken('CARET', `^${src[t.LONECARET]}${src[t.XRANGEPLAIN]}$`)
+createToken('CARETLOOSE', `^${src[t.LONECARET]}${src[t.XRANGEPLAINLOOSE]}$`)
+
+// A simple gt/lt/eq thing, or just "" to indicate "any version"
+createToken('COMPARATORLOOSE', `^${src[t.GTLT]}\\s*(${src[t.LOOSEPLAIN]})$|^$`)
+createToken('COMPARATOR', `^${src[t.GTLT]}\\s*(${src[t.FULLPLAIN]})$|^$`)
+
+// An expression to strip any whitespace between the gtlt and the thing
+// it modifies, so that `> 1.2.3` ==> `>1.2.3`
+createToken('COMPARATORTRIM', `(\\s*)${src[t.GTLT]
+}\\s*(${src[t.LOOSEPLAIN]}|${src[t.XRANGEPLAIN]})`, true)
+exports.comparatorTrimReplace = '$1$2$3'
+
+// Something like `1.2.3 - 1.2.4`
+// Note that these all use the loose form, because they'll be
+// checked against either the strict or loose comparator form
+// later.
+createToken('HYPHENRANGE', `^\\s*(${src[t.XRANGEPLAIN]})` +
+                   `\\s+-\\s+` +
+                   `(${src[t.XRANGEPLAIN]})` +
+                   `\\s*$`)
+
+createToken('HYPHENRANGELOOSE', `^\\s*(${src[t.XRANGEPLAINLOOSE]})` +
+                        `\\s+-\\s+` +
+                        `(${src[t.XRANGEPLAINLOOSE]})` +
+                        `\\s*$`)
+
+// Star ranges basically just allow anything at all.
+createToken('STAR', '(<|>)?=?\\s*\\*')
+// >=0.0.0 is like a star
+createToken('GTE0', '^\\s*>=\\s*0\\.0\\.0\\s*$')
+createToken('GTE0PRE', '^\\s*>=\\s*0\\.0\\.0-0\\s*$')
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/gtr.js":
+/*!****************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/gtr.js ***!
+  \****************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+// Determine if version is greater than all the versions possible in the range.
+const outside = __webpack_require__(/*! ./outside */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/outside.js")
+const gtr = (version, range, options) => outside(version, range, '>', options)
+module.exports = gtr
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/intersects.js":
+/*!***********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/intersects.js ***!
+  \***********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const intersects = (r1, r2, options) => {
+  r1 = new Range(r1, options)
+  r2 = new Range(r2, options)
+  return r1.intersects(r2, options)
+}
+module.exports = intersects
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/ltr.js":
+/*!****************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/ltr.js ***!
+  \****************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const outside = __webpack_require__(/*! ./outside */ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/outside.js")
+// Determine if version is less than all the versions possible in the range
+const ltr = (version, range, options) => outside(version, range, '<', options)
+module.exports = ltr
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/max-satisfying.js":
+/*!***************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/max-satisfying.js ***!
+  \***************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+
+const maxSatisfying = (versions, range, options) => {
+  let max = null
+  let maxSV = null
+  let rangeObj = null
+  try {
+    rangeObj = new Range(range, options)
+  } catch (er) {
+    return null
+  }
+  versions.forEach((v) => {
+    if (rangeObj.test(v)) {
+      // satisfies(v, range, options)
+      if (!max || maxSV.compare(v) === -1) {
+        // compare(max, v, true)
+        max = v
+        maxSV = new SemVer(max, options)
+      }
+    }
+  })
+  return max
+}
+module.exports = maxSatisfying
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-satisfying.js":
+/*!***************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-satisfying.js ***!
+  \***************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const minSatisfying = (versions, range, options) => {
+  let min = null
+  let minSV = null
+  let rangeObj = null
+  try {
+    rangeObj = new Range(range, options)
+  } catch (er) {
+    return null
+  }
+  versions.forEach((v) => {
+    if (rangeObj.test(v)) {
+      // satisfies(v, range, options)
+      if (!min || minSV.compare(v) === 1) {
+        // compare(min, v, true)
+        min = v
+        minSV = new SemVer(min, options)
+      }
+    }
+  })
+  return min
+}
+module.exports = minSatisfying
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-version.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/min-version.js ***!
+  \************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const gt = __webpack_require__(/*! ../functions/gt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js")
+
+const minVersion = (range, loose) => {
+  range = new Range(range, loose)
+
+  let minver = new SemVer('0.0.0')
+  if (range.test(minver)) {
+    return minver
+  }
+
+  minver = new SemVer('0.0.0-0')
+  if (range.test(minver)) {
+    return minver
+  }
+
+  minver = null
+  for (let i = 0; i < range.set.length; ++i) {
+    const comparators = range.set[i]
+
+    let setMin = null
+    comparators.forEach((comparator) => {
+      // Clone to avoid manipulating the comparator's semver object.
+      const compver = new SemVer(comparator.semver.version)
+      switch (comparator.operator) {
+        case '>':
+          if (compver.prerelease.length === 0) {
+            compver.patch++
+          } else {
+            compver.prerelease.push(0)
+          }
+          compver.raw = compver.format()
+          /* fallthrough */
+        case '':
+        case '>=':
+          if (!setMin || gt(compver, setMin)) {
+            setMin = compver
+          }
+          break
+        case '<':
+        case '<=':
+          /* Ignore maximum versions */
+          break
+        /* istanbul ignore next */
+        default:
+          throw new Error(`Unexpected operation: ${comparator.operator}`)
+      }
+    })
+    if (setMin && (!minver || gt(minver, setMin))) {
+      minver = setMin
+    }
+  }
+
+  if (minver && range.test(minver)) {
+    return minver
+  }
+
+  return null
+}
+module.exports = minVersion
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/outside.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/outside.js ***!
+  \********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/semver.js")
+const Comparator = __webpack_require__(/*! ../classes/comparator */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js")
+const { ANY } = Comparator
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const satisfies = __webpack_require__(/*! ../functions/satisfies */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js")
+const gt = __webpack_require__(/*! ../functions/gt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gt.js")
+const lt = __webpack_require__(/*! ../functions/lt */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lt.js")
+const lte = __webpack_require__(/*! ../functions/lte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/lte.js")
+const gte = __webpack_require__(/*! ../functions/gte */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/gte.js")
+
+const outside = (version, range, hilo, options) => {
+  version = new SemVer(version, options)
+  range = new Range(range, options)
+
+  let gtfn, ltefn, ltfn, comp, ecomp
+  switch (hilo) {
+    case '>':
+      gtfn = gt
+      ltefn = lte
+      ltfn = lt
+      comp = '>'
+      ecomp = '>='
+      break
+    case '<':
+      gtfn = lt
+      ltefn = gte
+      ltfn = gt
+      comp = '<'
+      ecomp = '<='
+      break
+    default:
+      throw new TypeError('Must provide a hilo val of "<" or ">"')
+  }
+
+  // If it satisfies the range it is not outside
+  if (satisfies(version, range, options)) {
+    return false
+  }
+
+  // From now on, variable terms are as if we're in "gtr" mode.
+  // but note that everything is flipped for the "ltr" function.
+
+  for (let i = 0; i < range.set.length; ++i) {
+    const comparators = range.set[i]
+
+    let high = null
+    let low = null
+
+    comparators.forEach((comparator) => {
+      if (comparator.semver === ANY) {
+        comparator = new Comparator('>=0.0.0')
+      }
+      high = high || comparator
+      low = low || comparator
+      if (gtfn(comparator.semver, high.semver, options)) {
+        high = comparator
+      } else if (ltfn(comparator.semver, low.semver, options)) {
+        low = comparator
+      }
+    })
+
+    // If the edge version comparator has a operator then our version
+    // isn't outside it
+    if (high.operator === comp || high.operator === ecomp) {
+      return false
+    }
+
+    // If the lowest version comparator has an operator and our version
+    // is less than it then it isn't higher than the range
+    if ((!low.operator || low.operator === comp) &&
+        ltefn(version, low.semver)) {
+      return false
+    } else if (low.operator === ecomp && ltfn(version, low.semver)) {
+      return false
+    }
+  }
+  return true
+}
+
+module.exports = outside
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/simplify.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/simplify.js ***!
+  \*********************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+// given a set of versions and a range, create a "simplified" range
+// that includes the same versions that the original range does
+// If the original range is shorter than the simplified one, return that.
+const satisfies = __webpack_require__(/*! ../functions/satisfies.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js")
+const compare = __webpack_require__(/*! ../functions/compare.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+module.exports = (versions, range, options) => {
+  const set = []
+  let first = null
+  let prev = null
+  const v = versions.sort((a, b) => compare(a, b, options))
+  for (const version of v) {
+    const included = satisfies(version, range, options)
+    if (included) {
+      prev = version
+      if (!first) {
+        first = version
+      }
+    } else {
+      if (prev) {
+        set.push([first, prev])
+      }
+      prev = null
+      first = null
+    }
+  }
+  if (first) {
+    set.push([first, null])
+  }
+
+  const ranges = []
+  for (const [min, max] of set) {
+    if (min === max) {
+      ranges.push(min)
+    } else if (!max && min === v[0]) {
+      ranges.push('*')
+    } else if (!max) {
+      ranges.push(`>=${min}`)
+    } else if (min === v[0]) {
+      ranges.push(`<=${max}`)
+    } else {
+      ranges.push(`${min} - ${max}`)
+    }
+  }
+  const simplified = ranges.join(' || ')
+  const original = typeof range.raw === 'string' ? range.raw : String(range)
+  return simplified.length < original.length ? simplified : range
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/subset.js":
+/*!*******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/subset.js ***!
+  \*******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const Range = __webpack_require__(/*! ../classes/range.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const Comparator = __webpack_require__(/*! ../classes/comparator.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/comparator.js")
+const { ANY } = Comparator
+const satisfies = __webpack_require__(/*! ../functions/satisfies.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/satisfies.js")
+const compare = __webpack_require__(/*! ../functions/compare.js */ "./node_modules/@puppeteer/browsers/node_modules/semver/functions/compare.js")
+
+// Complex range `r1 || r2 || ...` is a subset of `R1 || R2 || ...` iff:
+// - Every simple range `r1, r2, ...` is a null set, OR
+// - Every simple range `r1, r2, ...` which is not a null set is a subset of
+//   some `R1, R2, ...`
+//
+// Simple range `c1 c2 ...` is a subset of simple range `C1 C2 ...` iff:
+// - If c is only the ANY comparator
+//   - If C is only the ANY comparator, return true
+//   - Else if in prerelease mode, return false
+//   - else replace c with `[>=0.0.0]`
+// - If C is only the ANY comparator
+//   - if in prerelease mode, return true
+//   - else replace C with `[>=0.0.0]`
+// - Let EQ be the set of = comparators in c
+// - If EQ is more than one, return true (null set)
+// - Let GT be the highest > or >= comparator in c
+// - Let LT be the lowest < or <= comparator in c
+// - If GT and LT, and GT.semver > LT.semver, return true (null set)
+// - If any C is a = range, and GT or LT are set, return false
+// - If EQ
+//   - If GT, and EQ does not satisfy GT, return true (null set)
+//   - If LT, and EQ does not satisfy LT, return true (null set)
+//   - If EQ satisfies every C, return true
+//   - Else return false
+// - If GT
+//   - If GT.semver is lower than any > or >= comp in C, return false
+//   - If GT is >=, and GT.semver does not satisfy every C, return false
+//   - If GT.semver has a prerelease, and not in prerelease mode
+//     - If no C has a prerelease and the GT.semver tuple, return false
+// - If LT
+//   - If LT.semver is greater than any < or <= comp in C, return false
+//   - If LT is <=, and LT.semver does not satisfy every C, return false
+//   - If GT.semver has a prerelease, and not in prerelease mode
+//     - If no C has a prerelease and the LT.semver tuple, return false
+// - Else return true
+
+const subset = (sub, dom, options = {}) => {
+  if (sub === dom) {
+    return true
+  }
+
+  sub = new Range(sub, options)
+  dom = new Range(dom, options)
+  let sawNonNull = false
+
+  OUTER: for (const simpleSub of sub.set) {
+    for (const simpleDom of dom.set) {
+      const isSub = simpleSubset(simpleSub, simpleDom, options)
+      sawNonNull = sawNonNull || isSub !== null
+      if (isSub) {
+        continue OUTER
+      }
+    }
+    // the null set is a subset of everything, but null simple ranges in
+    // a complex range should be ignored.  so if we saw a non-null range,
+    // then we know this isn't a subset, but if EVERY simple range was null,
+    // then it is a subset.
+    if (sawNonNull) {
+      return false
+    }
+  }
+  return true
+}
+
+const minimumVersionWithPreRelease = [new Comparator('>=0.0.0-0')]
+const minimumVersion = [new Comparator('>=0.0.0')]
+
+const simpleSubset = (sub, dom, options) => {
+  if (sub === dom) {
+    return true
+  }
+
+  if (sub.length === 1 && sub[0].semver === ANY) {
+    if (dom.length === 1 && dom[0].semver === ANY) {
+      return true
+    } else if (options.includePrerelease) {
+      sub = minimumVersionWithPreRelease
+    } else {
+      sub = minimumVersion
+    }
+  }
+
+  if (dom.length === 1 && dom[0].semver === ANY) {
+    if (options.includePrerelease) {
+      return true
+    } else {
+      dom = minimumVersion
+    }
+  }
+
+  const eqSet = new Set()
+  let gt, lt
+  for (const c of sub) {
+    if (c.operator === '>' || c.operator === '>=') {
+      gt = higherGT(gt, c, options)
+    } else if (c.operator === '<' || c.operator === '<=') {
+      lt = lowerLT(lt, c, options)
+    } else {
+      eqSet.add(c.semver)
+    }
+  }
+
+  if (eqSet.size > 1) {
+    return null
+  }
+
+  let gtltComp
+  if (gt && lt) {
+    gtltComp = compare(gt.semver, lt.semver, options)
+    if (gtltComp > 0) {
+      return null
+    } else if (gtltComp === 0 && (gt.operator !== '>=' || lt.operator !== '<=')) {
+      return null
+    }
+  }
+
+  // will iterate one or zero times
+  for (const eq of eqSet) {
+    if (gt && !satisfies(eq, String(gt), options)) {
+      return null
+    }
+
+    if (lt && !satisfies(eq, String(lt), options)) {
+      return null
+    }
+
+    for (const c of dom) {
+      if (!satisfies(eq, String(c), options)) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  let higher, lower
+  let hasDomLT, hasDomGT
+  // if the subset has a prerelease, we need a comparator in the superset
+  // with the same tuple and a prerelease, or it's not a subset
+  let needDomLTPre = lt &&
+    !options.includePrerelease &&
+    lt.semver.prerelease.length ? lt.semver : false
+  let needDomGTPre = gt &&
+    !options.includePrerelease &&
+    gt.semver.prerelease.length ? gt.semver : false
+  // exception: <1.2.3-0 is the same as <1.2.3
+  if (needDomLTPre && needDomLTPre.prerelease.length === 1 &&
+      lt.operator === '<' && needDomLTPre.prerelease[0] === 0) {
+    needDomLTPre = false
+  }
+
+  for (const c of dom) {
+    hasDomGT = hasDomGT || c.operator === '>' || c.operator === '>='
+    hasDomLT = hasDomLT || c.operator === '<' || c.operator === '<='
+    if (gt) {
+      if (needDomGTPre) {
+        if (c.semver.prerelease && c.semver.prerelease.length &&
+            c.semver.major === needDomGTPre.major &&
+            c.semver.minor === needDomGTPre.minor &&
+            c.semver.patch === needDomGTPre.patch) {
+          needDomGTPre = false
+        }
+      }
+      if (c.operator === '>' || c.operator === '>=') {
+        higher = higherGT(gt, c, options)
+        if (higher === c && higher !== gt) {
+          return false
+        }
+      } else if (gt.operator === '>=' && !satisfies(gt.semver, String(c), options)) {
+        return false
+      }
+    }
+    if (lt) {
+      if (needDomLTPre) {
+        if (c.semver.prerelease && c.semver.prerelease.length &&
+            c.semver.major === needDomLTPre.major &&
+            c.semver.minor === needDomLTPre.minor &&
+            c.semver.patch === needDomLTPre.patch) {
+          needDomLTPre = false
+        }
+      }
+      if (c.operator === '<' || c.operator === '<=') {
+        lower = lowerLT(lt, c, options)
+        if (lower === c && lower !== lt) {
+          return false
+        }
+      } else if (lt.operator === '<=' && !satisfies(lt.semver, String(c), options)) {
+        return false
+      }
+    }
+    if (!c.operator && (lt || gt) && gtltComp !== 0) {
+      return false
+    }
+  }
+
+  // if there was a < or >, and nothing in the dom, then must be false
+  // UNLESS it was limited by another range in the other direction.
+  // Eg, >1.0.0 <1.0.1 is still a subset of <2.0.0
+  if (gt && hasDomLT && !lt && gtltComp !== 0) {
+    return false
+  }
+
+  if (lt && hasDomGT && !gt && gtltComp !== 0) {
+    return false
+  }
+
+  // we needed a prerelease range in a specific tuple, but didn't get one
+  // then this isn't a subset.  eg >=1.2.3-pre is not a subset of >=1.0.0,
+  // because it includes prereleases in the 1.2.3 tuple
+  if (needDomGTPre || needDomLTPre) {
+    return false
+  }
+
+  return true
+}
+
+// >=1.2.3 is lower than >1.2.3
+const higherGT = (a, b, options) => {
+  if (!a) {
+    return b
+  }
+  const comp = compare(a.semver, b.semver, options)
+  return comp > 0 ? a
+    : comp < 0 ? b
+    : b.operator === '>' && a.operator === '>=' ? b
+    : a
+}
+
+// <=1.2.3 is higher than <1.2.3
+const lowerLT = (a, b, options) => {
+  if (!a) {
+    return b
+  }
+  const comp = compare(a.semver, b.semver, options)
+  return comp < 0 ? a
+    : comp > 0 ? b
+    : b.operator === '<' && a.operator === '<=' ? b
+    : a
+}
+
+module.exports = subset
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/to-comparators.js":
+/*!***************************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/to-comparators.js ***!
+  \***************************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+
+// Mostly just for testing and legacy API reasons
+const toComparators = (range, options) =>
+  new Range(range, options).set
+    .map(comp => comp.map(c => c.value).join(' ').trim().split(' '))
+
+module.exports = toComparators
+
+
+/***/ }),
+
+/***/ "./node_modules/@puppeteer/browsers/node_modules/semver/ranges/valid.js":
+/*!******************************************************************************!*\
+  !*** ./node_modules/@puppeteer/browsers/node_modules/semver/ranges/valid.js ***!
+  \******************************************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/@puppeteer/browsers/node_modules/semver/classes/range.js")
+const validRange = (range, options) => {
+  try {
+    // Return '*' instead of '' so that truthiness works.
+    // This will throw if it's invalid anyway
+    return new Range(range, options).range || '*'
+  } catch (er) {
+    return null
+  }
+}
+module.exports = validRange
+
+
+/***/ }),
+
 /***/ "./node_modules/@tootallnate/quickjs-emscripten/dist/asyncify-helpers.js":
 /*!*******************************************************************************!*\
   !*** ./node_modules/@tootallnate/quickjs-emscripten/dist/asyncify-helpers.js ***!
@@ -11097,7 +15089,7 @@ class BidiServer extends EventEmitter_js_1.EventEmitter {
         this.#transport.setOnMessage(this.#handleIncomingMessage);
         this.#eventManager = new EventManager_js_1.EventManager(this.#browsingContextStorage);
         const networkStorage = new NetworkStorage_js_1.NetworkStorage(this.#eventManager, this.#browsingContextStorage, browserCdpClient, logger);
-        new CdpTargetManager_js_1.CdpTargetManager(cdpConnection, browserCdpClient, selfTargetId, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, networkStorage, this.#preloadScriptStorage, defaultUserContextId, options?.unhandledPromptBehavior, logger);
+        new CdpTargetManager_js_1.CdpTargetManager(cdpConnection, browserCdpClient, selfTargetId, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, networkStorage, this.#preloadScriptStorage, options?.acceptInsecureCerts ?? false, defaultUserContextId, options?.unhandledPromptBehavior, logger);
         this.#commandProcessor = new CommandProcessor_js_1.CommandProcessor(cdpConnection, browserCdpClient, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, this.#preloadScriptStorage, networkStorage, parser, this.#logger);
         this.#eventManager.on("event" /* EventManagerEvents.Event */, ({ message, event }) => {
             this.emitOutgoingMessage(message, event);
@@ -11117,10 +15109,6 @@ class BidiServer extends EventEmitter_js_1.EventEmitter {
         const [{ browserContextIds }, { targetInfos }] = await Promise.all([
             browserCdpClient.sendCommand('Target.getBrowserContexts'),
             browserCdpClient.sendCommand('Target.getTargets'),
-            // This is required to ignore certificate errors when service worker is fetched.
-            browserCdpClient.sendCommand('Security.setIgnoreCertificateErrors', {
-                ignore: options?.acceptInsecureCerts ?? false,
-            }),
         ]);
         let defaultUserContextId = 'default';
         for (const info of targetInfos) {
@@ -11311,8 +15299,6 @@ class CommandProcessor extends EventEmitter_js_1.EventEmitter {
                 return await this.#networkProcessor.provideResponse(this.#parser.parseProvideResponseParams(command.params));
             case 'network.removeIntercept':
                 return await this.#networkProcessor.removeIntercept(this.#parser.parseRemoveInterceptParams(command.params));
-            case 'network.setCacheBehavior':
-                throw new protocol_js_1.UnknownErrorException("Method 'network.setCacheBehavior' is not implemented.");
             // keep-sorted end
             // Permissions domain
             // keep-sorted start block=yes
@@ -11337,7 +15323,7 @@ class CommandProcessor extends EventEmitter_js_1.EventEmitter {
             // Session domain
             // keep-sorted start block=yes
             case 'session.new':
-                return await this.#sessionProcessor.new(command.params);
+                return await this.#sessionProcessor.create(command.params);
             case 'session.status':
                 return this.#sessionProcessor.status();
             case 'session.subscribe':
@@ -11658,6 +15644,7 @@ class CdpTarget {
     #networkStorage;
     #unblocked = new Deferred_js_1.Deferred();
     #unhandledPromptBehavior;
+    #acceptInsecureCerts;
     #logger;
     #networkDomainEnabled = false;
     #fetchDomainStages = {
@@ -11665,8 +15652,8 @@ class CdpTarget {
         response: false,
         auth: false,
     };
-    static create(targetId, cdpClient, browserCdpClient, realmStorage, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger) {
-        const cdpTarget = new CdpTarget(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger);
+    static create(targetId, cdpClient, browserCdpClient, realmStorage, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts, unhandledPromptBehavior, logger) {
+        const cdpTarget = new CdpTarget(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts, unhandledPromptBehavior, logger);
         LogManager_js_1.LogManager.create(cdpTarget, realmStorage, eventManager, logger);
         cdpTarget.#setEventListeners();
         // No need to await.
@@ -11674,7 +15661,7 @@ class CdpTarget {
         void cdpTarget.#unblock();
         return cdpTarget;
     }
-    constructor(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger) {
+    constructor(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts, unhandledPromptBehavior, logger) {
         this.#id = targetId;
         this.#cdpClient = cdpClient;
         this.#browserCdpClient = browserCdpClient;
@@ -11683,6 +15670,7 @@ class CdpTarget {
         this.#preloadScriptStorage = preloadScriptStorage;
         this.#networkStorage = networkStorage;
         this.#browsingContextStorage = browsingContextStorage;
+        this.#acceptInsecureCerts = acceptInsecureCerts;
         this.#unhandledPromptBehavior = unhandledPromptBehavior;
         this.#logger = logger;
     }
@@ -11726,6 +15714,10 @@ class CdpTarget {
                 this.#cdpClient.sendCommand('Page.setLifecycleEventsEnabled', {
                     enabled: true,
                 }),
+                // Set ignore certificate errors for each target.
+                this.#cdpClient.sendCommand('Security.setIgnoreCertificateErrors', {
+                    ignore: this.#acceptInsecureCerts,
+                }),
                 this.toggleNetworkIfNeeded(),
                 this.#cdpClient.sendCommand('Target.setAutoAttach', {
                     autoAttach: true,
@@ -11754,19 +15746,10 @@ class CdpTarget {
     }
     #restoreFrameTreeState(frameTree) {
         const frame = frameTree.frame;
-        const maybeContext = this.#browsingContextStorage.findContext(frame.id);
-        if (maybeContext !== undefined) {
-            // Restoring parent of already known browsing context. This means the target is
-            // OOPiF and the BiDi session was connected to already existing browser instance.
-            if (maybeContext.parentId === null &&
-                frame.parentId !== null &&
-                frame.parentId !== undefined) {
-                maybeContext.parentId = frame.parentId;
-            }
-        }
-        if (maybeContext === undefined && frame.parentId !== undefined) {
-            // Restore not yet known nested frames. The top-level frame is created when the
-            // target is attached.
+        if (this.#browsingContextStorage.findContext(frame.id) === undefined &&
+            frame.parentId !== undefined) {
+            // Can restore only not yet known nested frames. The top-level frame is created
+            // when the target is attached.
             const parentBrowsingContext = this.#browsingContextStorage.getContext(frame.parentId);
             BrowsingContextImpl_js_1.BrowsingContextImpl.create(frame.id, frame.parentId, parentBrowsingContext.userContext, parentBrowsingContext.cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, frame.url, undefined, this.#unhandledPromptBehavior, this.#logger);
         }
@@ -11899,20 +15882,20 @@ const cdpToBidiTargetTypes = {
 class CdpTargetManager {
     #browserCdpClient;
     #cdpConnection;
-    #targetKeysToBeIgnoredByAutoAttach = new Set();
     #selfTargetId;
     #eventManager;
     #browsingContextStorage;
     #networkStorage;
+    #acceptInsecureCerts;
     #preloadScriptStorage;
     #realmStorage;
     #defaultUserContextId;
     #logger;
     #unhandledPromptBehavior;
-    constructor(cdpConnection, browserCdpClient, selfTargetId, eventManager, browsingContextStorage, realmStorage, networkStorage, preloadScriptStorage, defaultUserContextId, unhandledPromptBehavior, logger) {
+    constructor(cdpConnection, browserCdpClient, selfTargetId, eventManager, browsingContextStorage, realmStorage, networkStorage, preloadScriptStorage, acceptInsecureCerts, defaultUserContextId, unhandledPromptBehavior, logger) {
+        this.#acceptInsecureCerts = acceptInsecureCerts;
         this.#cdpConnection = cdpConnection;
         this.#browserCdpClient = browserCdpClient;
-        this.#targetKeysToBeIgnoredByAutoAttach.add(selfTargetId);
         this.#selfTargetId = selfTargetId;
         this.#eventManager = eventManager;
         this.#browsingContextStorage = browsingContextStorage;
@@ -11959,41 +15942,15 @@ class CdpTargetManager {
     #handleAttachedToTargetEvent(params, parentSessionCdpClient) {
         const { sessionId, targetInfo } = params;
         const targetCdpClient = this.#cdpConnection.getCdpClient(sessionId);
-        const detach = async () => {
-            // Detaches and resumes the target suppressing errors.
-            await targetCdpClient
-                .sendCommand('Runtime.runIfWaitingForDebugger')
-                .then(() => parentSessionCdpClient.sendCommand('Target.detachFromTarget', params))
-                .catch((error) => this.#logger?.(log_js_1.LogType.debugError, error));
-        };
-        if (this.#selfTargetId !== targetInfo.targetId) {
-            // Service workers are special case because they attach to the
-            // browser target and the page target (so twice per worker) during
-            // the regular auto-attach and might hang if the CDP session on
-            // the browser level is not detached. The logic to detach the
-            // right session is handled in the switch below.
-            const targetKey = targetInfo.type === 'service_worker'
-                ? `${parentSessionCdpClient.sessionId}_${targetInfo.targetId}`
-                : targetInfo.targetId;
-            // Mapper generally only needs one session per target. If we
-            // receive additional auto-attached sessions, that is very likely
-            // coming from custom CDP sessions.
-            if (this.#targetKeysToBeIgnoredByAutoAttach.has(targetKey)) {
-                // Return to leave the session untouched.
-                return;
-            }
-            this.#targetKeysToBeIgnoredByAutoAttach.add(targetKey);
-        }
         switch (targetInfo.type) {
             case 'page':
             case 'iframe': {
-                if (this.#selfTargetId === targetInfo.targetId) {
-                    void detach();
-                    return;
+                if (targetInfo.targetId === this.#selfTargetId) {
+                    break;
                 }
                 const cdpTarget = this.#createCdpTarget(targetCdpClient, targetInfo);
                 const maybeContext = this.#browsingContextStorage.findContext(targetInfo.targetId);
-                if (maybeContext && targetInfo.type === 'iframe') {
+                if (maybeContext) {
                     // OOPiF.
                     maybeContext.updateCdpTarget(cdpTarget);
                 }
@@ -12023,8 +15980,7 @@ class CdpTargetManager {
                 });
                 // If there is no browsing context, this worker is already terminated.
                 if (!realm) {
-                    void detach();
-                    return;
+                    break;
                 }
                 const cdpTarget = this.#createCdpTarget(targetCdpClient, targetInfo);
                 this.#handleWorkerTarget(cdpToBidiTargetTypes[targetInfo.type], cdpTarget, realm);
@@ -12042,11 +15998,14 @@ class CdpTargetManager {
         }
         // DevTools or some other not supported by BiDi target. Just release
         // debugger and ignore them.
-        void detach();
+        targetCdpClient
+            .sendCommand('Runtime.runIfWaitingForDebugger')
+            .then(() => parentSessionCdpClient.sendCommand('Target.detachFromTarget', params))
+            .catch((error) => this.#logger?.(log_js_1.LogType.debugError, error));
     }
     #createCdpTarget(targetCdpClient, targetInfo) {
         this.#setEventListeners(targetCdpClient);
-        const target = CdpTarget_js_1.CdpTarget.create(targetInfo.targetId, targetCdpClient, this.#browserCdpClient, this.#realmStorage, this.#eventManager, this.#preloadScriptStorage, this.#browsingContextStorage, this.#networkStorage, this.#unhandledPromptBehavior, this.#logger);
+        const target = CdpTarget_js_1.CdpTarget.create(targetInfo.targetId, targetCdpClient, this.#browserCdpClient, this.#realmStorage, this.#eventManager, this.#preloadScriptStorage, this.#browsingContextStorage, this.#networkStorage, this.#acceptInsecureCerts, this.#unhandledPromptBehavior, this.#logger);
         this.#networkStorage.onCdpTargetCreated(target);
         return target;
     }
@@ -12142,7 +16101,7 @@ class BrowsingContextImpl {
      * The ID of the parent browsing context.
      * If null, this is a top-level context.
      */
-    #parentId = null;
+    #parentId;
     /** Direct children browsing contexts. */
     #children = new Set();
     #browsingContextStorage;
@@ -12193,24 +16152,11 @@ class BrowsingContextImpl {
         if (!context.isTopLevelContext()) {
             context.parent.addChild(context.id);
         }
-        // Hold on the `contextCreated` event until the target is unblocked. This is required,
-        // as the parent of the context can be set later in case of reconnecting to an
-        // existing browser instance + OOPiF.
-        eventManager.registerPromiseEvent(context.targetUnblockedOrThrow().then(() => {
-            return {
-                kind: 'success',
-                value: {
-                    type: 'event',
-                    method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated,
-                    params: context.serializeToBidiValue(),
-                },
-            };
-        }, (error) => {
-            return {
-                kind: 'error',
-                error,
-            };
-        }), context.id, protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated);
+        eventManager.registerEvent({
+            type: 'event',
+            method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated,
+            params: context.serializeToBidiValue(),
+        }, context.id);
         return context;
     }
     static getTimestamp() {
@@ -12259,19 +16205,6 @@ class BrowsingContextImpl {
     /** Returns the parent context ID. */
     get parentId() {
         return this.#parentId;
-    }
-    /** Sets the parent context ID and updates parent's children. */
-    set parentId(parentId) {
-        if (this.#parentId !== null) {
-            this.#logger?.(log_js_1.LogType.debugError, 'Parent context already set');
-            // Cannot do anything except logging, as throwing will stop event processing. So
-            // just return,
-            return;
-        }
-        this.#parentId = parentId;
-        if (!this.isTopLevelContext()) {
-            this.parent.addChild(this.id);
-        }
     }
     /** Returns the parent context. */
     get parent() {
@@ -12586,13 +16519,13 @@ class BrowsingContextImpl {
             switch (promptHandler) {
                 // Based on `unhandledPromptBehavior`, check if the prompt should be handled
                 // automatically (`accept`, `dismiss`) or wait for the user to do it.
-                case "accept" /* Session.UserPromptHandlerType.Accept */:
+                case 'accept':
                     void this.handleUserPrompt(true);
                     break;
-                case "dismiss" /* Session.UserPromptHandlerType.Dismiss */:
+                case 'dismiss':
                     void this.handleUserPrompt(false);
                     break;
-                case "ignore" /* Session.UserPromptHandlerType.Ignore */:
+                case 'ignore':
                     break;
             }
         });
@@ -12610,7 +16543,7 @@ class BrowsingContextImpl {
         }
     }
     #getPromptHandler(promptType) {
-        const defaultPromptHandler = "dismiss" /* Session.UserPromptHandlerType.Dismiss */;
+        const defaultPromptHandler = 'dismiss';
         switch (promptType) {
             case "alert" /* BrowsingContext.UserPromptType.Alert */:
                 return (this.#unhandledPromptBehavior?.alert ??
@@ -12619,7 +16552,7 @@ class BrowsingContextImpl {
             case "beforeunload" /* BrowsingContext.UserPromptType.Beforeunload */:
                 return (this.#unhandledPromptBehavior?.beforeUnload ??
                     this.#unhandledPromptBehavior?.default ??
-                    "accept" /* Session.UserPromptHandlerType.Accept */);
+                    defaultPromptHandler);
             case "confirm" /* BrowsingContext.UserPromptType.Confirm */:
                 return (this.#unhandledPromptBehavior?.confirm ??
                     this.#unhandledPromptBehavior?.default ??
@@ -16135,6 +20068,8 @@ class NetworkProcessor {
         const request = this.#getBlockedRequestOrFail(params.request, [
             "beforeRequestSent" /* Network.InterceptPhase.BeforeRequestSent */,
         ]);
+        // TODO: Set / expand.
+        // ; Step 9. cookies
         try {
             await request.continueRequest(params);
         }
@@ -16151,6 +20086,8 @@ class NetworkProcessor {
             "authRequired" /* Network.InterceptPhase.AuthRequired */,
             "responseStarted" /* Network.InterceptPhase.ResponseStarted */,
         ]);
+        // TODO: Set / expand.
+        // ; Step 10. cookies
         try {
             await request.continueResponse(params);
         }
@@ -16182,6 +20119,8 @@ class NetworkProcessor {
         if (params.headers) {
             NetworkProcessor.validateHeaders(params.headers);
         }
+        // TODO: Set / expand.
+        // ; Step 10. cookies
         const request = this.#getBlockedRequestOrFail(params.request, [
             "beforeRequestSent" /* Network.InterceptPhase.BeforeRequestSent */,
             "responseStarted" /* Network.InterceptPhase.ResponseStarted */,
@@ -16466,6 +20405,14 @@ class NetworkRequest {
             NetworkRequest.unknownParameter;
         return `${url}${fragment}`;
     }
+    get method() {
+        return (this.#requestOverrides?.method ??
+            this.#request.info?.request.method ??
+            this.#request.paused?.request.method ??
+            this.#request.auth?.request.method ??
+            this.#response.paused?.request.method ??
+            NetworkRequest.unknownParameter);
+    }
     get redirectCount() {
         return this.#redirectCount;
     }
@@ -16478,118 +20425,8 @@ class NetworkRequest {
     isRedirecting() {
         return Boolean(this.#request.info);
     }
-    #isDataUrl() {
+    isDataUrl() {
         return this.url.startsWith('data:');
-    }
-    get #method() {
-        return (this.#requestOverrides?.method ??
-            this.#request.info?.request.method ??
-            this.#request.paused?.request.method ??
-            this.#request.auth?.request.method ??
-            this.#response.paused?.request.method);
-    }
-    get #navigationId() {
-        // Heuristic to determine if this is a navigation request, and if not return null.
-        if (!this.#request.info ||
-            !this.#request.info.loaderId ||
-            // When we navigate all CDP network events have `loaderId`
-            // CDP's `loaderId` and `requestId` match when
-            // that request triggered the loading
-            this.#request.info.loaderId !== this.#request.info.requestId) {
-            return null;
-        }
-        // Get virtual navigation ID from the browsing context.
-        return this.#networkStorage.getVirtualNavigationId(this.#context ?? undefined);
-    }
-    get #cookies() {
-        let cookies = [];
-        if (this.#request.extraInfo) {
-            cookies = this.#request.extraInfo.associatedCookies
-                .filter(({ blockedReasons }) => {
-                return !Array.isArray(blockedReasons) || blockedReasons.length === 0;
-            })
-                .map(({ cookie }) => (0, NetworkUtils_js_1.cdpToBiDiCookie)(cookie));
-        }
-        return cookies;
-    }
-    get #bodySize() {
-        let bodySize = 0;
-        if (typeof this.#requestOverrides?.bodySize === 'number') {
-            bodySize = this.#requestOverrides.bodySize;
-        }
-        else {
-            bodySize = (0, NetworkUtils_js_1.bidiBodySizeFromCdpPostDataEntries)(this.#request.info?.request.postDataEntries ?? []);
-        }
-        return bodySize;
-    }
-    get #context() {
-        return (this.#response.paused?.frameId ??
-            this.#request.info?.frameId ??
-            this.#request.paused?.frameId ??
-            this.#request.auth?.frameId ??
-            null);
-    }
-    /** Returns the HTTP status code associated with this request if any. */
-    get #statusCode() {
-        return (this.#response.paused?.responseStatusCode ??
-            this.#response.extraInfo?.statusCode ??
-            this.#response.info?.status);
-    }
-    get #requestHeaders() {
-        let headers = [];
-        if (this.#requestOverrides?.headers) {
-            headers = this.#requestOverrides.headers;
-        }
-        else {
-            headers = [
-                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.info?.request.headers),
-                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.extraInfo?.headers),
-            ];
-        }
-        return headers;
-    }
-    get #authChallenges() {
-        // TODO: get headers from Fetch.requestPaused
-        if (!this.#response.info) {
-            return;
-        }
-        if (!(this.#statusCode === 401 || this.#statusCode === 407)) {
-            return undefined;
-        }
-        const headerName = this.#statusCode === 401 ? 'WWW-Authenticate' : 'Proxy-Authenticate';
-        const authChallenges = [];
-        for (const [header, value] of Object.entries(this.#response.info.headers)) {
-            // TODO: Do a proper match based on https://httpwg.org/specs/rfc9110.html#credentials
-            // Or verify this works
-            if (header.localeCompare(headerName, undefined, { sensitivity: 'base' }) === 0) {
-                authChallenges.push({
-                    scheme: value.split(' ').at(0) ?? '',
-                    realm: value.match(REALM_REGEX)?.at(0) ?? '',
-                });
-            }
-        }
-        return authChallenges;
-    }
-    get #timings() {
-        return {
-            // TODO: Verify this is correct
-            timeOrigin: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
-            requestTime: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
-            redirectStart: 0,
-            redirectEnd: 0,
-            // TODO: Verify this is correct
-            // https://source.chromium.org/chromium/chromium/src/+/main:net/base/load_timing_info.h;l=145
-            fetchStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
-            dnsStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.dnsStart),
-            dnsEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.dnsEnd),
-            connectStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.connectStart),
-            connectEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.connectEnd),
-            tlsStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.sslStart),
-            requestStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.sendStart),
-            // https://source.chromium.org/chromium/chromium/src/+/main:net/base/load_timing_info.h;l=196
-            responseStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.receiveHeadersStart),
-            responseEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.receiveHeadersEnd),
-        };
     }
     #phaseChanged() {
         this.waitNextPhase.resolve();
@@ -16618,7 +20455,7 @@ class NetworkRequest {
         // Flush redirects
         options.wasRedirected ||
             options.hasFailed ||
-            this.#isDataUrl() ||
+            this.isDataUrl() ||
             Boolean(this.#request.extraInfo) ||
             // Requests from cache don't have extra info
             this.#servedFromCache ||
@@ -16627,7 +20464,7 @@ class NetworkRequest {
             Boolean(this.#response.info && !this.#response.hasExtraInfo);
         const noInterceptionExpected = 
         // We can't intercept data urls from CDP
-        this.#isDataUrl() ||
+        this.isDataUrl() ||
             // Cached requests never hit the network
             this.#servedFromCache;
         const requestInterceptionExpected = !noInterceptionExpected &&
@@ -16769,8 +20606,7 @@ class NetworkRequest {
     }
     /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueRequest */
     async continueRequest(overrides = {}) {
-        const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
-        const headers = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
+        const headers = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrides.headers);
         const postData = getCdpBodyFromBiDiBytesValue(overrides.body);
         await this.#continueRequest({
             url: overrides.url,
@@ -16778,11 +20614,11 @@ class NetworkRequest {
             headers,
             postData,
         });
+        // TODO: Store postData's size only
         this.#requestOverrides = {
             url: overrides.url,
             method: overrides.method,
             headers: overrides.headers,
-            cookies: overrides.cookies,
             bodySize: getSizeFromBiDiBytesValue(overrides.body),
         };
     }
@@ -16819,8 +20655,7 @@ class NetworkRequest {
             }
         }
         if (this.#interceptPhase === "responseStarted" /* Network.InterceptPhase.ResponseStarted */) {
-            const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
-            const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
+            const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrides.headers);
             await this.#continueResponse({
                 responseCode: overrides.statusCode,
                 responsePhrase: overrides.reasonPhrase,
@@ -16871,9 +20706,10 @@ class NetworkRequest {
         if (!overrides.body && !overrides.headers) {
             return await this.#continueRequest();
         }
-        const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
-        const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
-        const responseCode = overrides.statusCode ?? this.#statusCode ?? 200;
+        // TODO: Step 6
+        // https://w3c.github.io/webdriver-bidi/#command-network-continueResponse
+        const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrides.headers);
+        const responseCode = overrides.statusCode ?? this.statusCode ?? 200;
         await this.cdpClient.sendCommand('Fetch.fulfillRequest', {
             requestId: this.#fetchId,
             responseCode,
@@ -16882,6 +20718,19 @@ class NetworkRequest {
             body: getCdpBodyFromBiDiBytesValue(overrides.body),
         });
         this.#interceptPhase = undefined;
+    }
+    get #context() {
+        return (this.#response.paused?.frameId ??
+            this.#request.info?.frameId ??
+            this.#request.paused?.frameId ??
+            this.#request.auth?.frameId ??
+            null);
+    }
+    /** Returns the HTTP status code associated with this request if any. */
+    get statusCode() {
+        return (this.#response.paused?.responseStatusCode ??
+            this.#response.extraInfo?.statusCode ??
+            this.#response.info?.status);
     }
     async #continueWithAuth(authChallengeResponse) {
         (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
@@ -16925,11 +20774,11 @@ class NetworkRequest {
         }
         return {
             context: this.#context,
-            navigation: this.#navigationId,
+            navigation: this.#getNavigationId(),
             redirectCount: this.#redirectCount,
             request: this.#getRequestData(),
             // Timestamp should be in milliseconds, while CDP provides it in seconds.
-            timestamp: Math.round((0, NetworkUtils_js_1.getTiming)(this.#request.info?.wallTime) * 1000),
+            timestamp: Math.round((this.#request.info?.wallTime ?? 0) * 1000),
             // Contains isBlocked and intercepts
             ...interceptProps,
         };
@@ -16949,11 +20798,12 @@ class NetworkRequest {
             //   this.#response.paused?.responseHeaders
             // ),
         ];
-        const authChallenges = this.#authChallenges;
+        // TODO: get headers from Fetch.requestPaused
+        const authChallenges = this.#authChallenges(this.#response.info?.headers ?? {});
         return {
             url: this.url,
             protocol: this.#response.info?.protocol ?? '',
-            status: this.#statusCode ?? -1, // TODO: Throw an exception or use some other status code?
+            status: this.statusCode ?? -1, // TODO: Throw an exception or use some other status code?
             statusText: this.#response.info?.statusText ||
                 this.#response.paused?.responseStatusText ||
                 '',
@@ -16971,25 +20821,69 @@ class NetworkRequest {
                 size: 0,
             },
             ...(authChallenges ? { authChallenges } : {}),
-            // @ts-expect-error this is a CDP-specific extension.
-            'goog:securityDetails': this.#response.info?.securityDetails,
         };
     }
+    #getNavigationId() {
+        // Heuristic to determine if this is a navigation request, and if not return null.
+        if (!this.#request.info ||
+            !this.#request.info.loaderId ||
+            // When we navigate all CDP network events have `loaderId`
+            // CDP's `loaderId` and `requestId` match when
+            // that request triggered the loading
+            this.#request.info.loaderId !== this.#request.info.requestId) {
+            return null;
+        }
+        // Get virtual navigation ID from the browsing context.
+        return this.#networkStorage.getVirtualNavigationId(this.#request?.info?.frameId);
+    }
     #getRequestData() {
-        const headers = this.#requestHeaders;
+        const cookies = this.#request.extraInfo
+            ? NetworkRequest.#getCookies(this.#request.extraInfo.associatedCookies)
+            : [];
+        let headers = [];
+        if (this.#requestOverrides?.headers) {
+            headers = this.#requestOverrides.headers;
+        }
+        else {
+            headers = [
+                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.info?.request.headers),
+                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.extraInfo?.headers),
+            ];
+        }
+        let bodySize = 0;
+        if (typeof this.#requestOverrides?.bodySize === 'number') {
+            bodySize = this.#requestOverrides.bodySize;
+        }
+        else {
+            bodySize = (0, NetworkUtils_js_1.bidiBodySizeFromCdpPostDataEntries)(this.#request.info?.request.postDataEntries ?? []);
+        }
         return {
             request: this.#id,
             url: this.url,
-            method: this.#method ?? NetworkRequest.unknownParameter,
+            method: this.method,
             headers,
-            cookies: this.#cookies,
+            cookies,
             headersSize: (0, NetworkUtils_js_1.computeHeadersSize)(headers),
-            bodySize: this.#bodySize,
-            timings: this.#timings,
-            // @ts-expect-error CDP-specific attribute.
-            'goog:postData': this.#request.info?.request?.postData,
-            'goog:hasPostData': this.#request.info?.request?.hasPostData,
-            'goog:resourceType': this.#request.info?.type,
+            bodySize,
+            timings: this.#getTimings(),
+        };
+    }
+    // TODO: implement.
+    #getTimings() {
+        return {
+            timeOrigin: 0,
+            requestTime: 0,
+            redirectStart: 0,
+            redirectEnd: 0,
+            fetchStart: 0,
+            dnsStart: 0,
+            dnsEnd: 0,
+            connectStart: 0,
+            connectEnd: 0,
+            tlsStart: 0,
+            requestStart: 0,
+            responseStart: 0,
+            responseEnd: 0,
         };
     }
     #getBeforeRequestEvent() {
@@ -17009,6 +20903,10 @@ class NetworkRequest {
         };
     }
     #getResponseStartedEvent() {
+        (0, assert_js_1.assert)(this.#request.info, 'RequestWillBeSentEvent is not set');
+        (0, assert_js_1.assert)(
+        // The response paused comes before any data for the response
+        this.#response.paused || this.#response.info, 'ResponseReceivedEvent is not set');
         return {
             method: protocol_js_1.ChromiumBidi.Network.EventNames.ResponseStarted,
             params: {
@@ -17018,6 +20916,8 @@ class NetworkRequest {
         };
     }
     #getResponseReceivedEvent() {
+        (0, assert_js_1.assert)(this.#request.info, 'RequestWillBeSentEvent is not set');
+        (0, assert_js_1.assert)(this.#response.info, 'ResponseReceivedEvent is not set');
         return {
             method: protocol_js_1.ChromiumBidi.Network.EventNames.ResponseCompleted,
             params: {
@@ -17032,22 +20932,23 @@ class NetworkRequest {
             this.#request.info?.request.url.endsWith(faviconUrl) ??
             false);
     }
-    #getOverrideHeader(headers, cookies) {
-        if (!headers && !cookies) {
+    #authChallenges(headers) {
+        if (!(this.statusCode === 401 || this.statusCode === 407)) {
             return undefined;
         }
-        let overrideHeaders = headers;
-        const cookieHeader = (0, NetworkUtils_js_1.networkHeaderFromCookieHeaders)(cookies);
-        if (cookieHeader && !overrideHeaders) {
-            overrideHeaders = this.#requestHeaders;
+        const headerName = this.statusCode === 401 ? 'WWW-Authenticate' : 'Proxy-Authenticate';
+        const authChallenges = [];
+        for (const [header, value] of Object.entries(headers)) {
+            // TODO: Do a proper match based on https://httpwg.org/specs/rfc9110.html#credentials
+            // Or verify this works
+            if (header.localeCompare(headerName, undefined, { sensitivity: 'base' }) === 0) {
+                authChallenges.push({
+                    scheme: value.split(' ').at(0) ?? '',
+                    realm: value.match(REALM_REGEX)?.at(0) ?? '',
+                });
+            }
         }
-        if (cookieHeader && overrideHeaders) {
-            overrideHeaders.filter((header) => header.name.localeCompare('cookie', undefined, {
-                sensitivity: 'base',
-            }) !== 0);
-            overrideHeaders.push(cookieHeader);
-        }
-        return overrideHeaders;
+        return authChallenges;
     }
     static #getInitiatorType(initiatorType) {
         switch (initiatorType) {
@@ -17058,6 +20959,13 @@ class NetworkRequest {
             default:
                 return 'other';
         }
+    }
+    static #getCookies(associatedCookies) {
+        return associatedCookies
+            .filter(({ blockedReasons }) => {
+            return !Array.isArray(blockedReasons) || blockedReasons.length === 0;
+        })
+            .map(({ cookie }) => (0, NetworkUtils_js_1.cdpToBiDiCookie)(cookie));
     }
 }
 exports.NetworkRequest = NetworkRequest;
@@ -17336,7 +21244,6 @@ exports.bidiNetworkHeadersFromCdpNetworkHeadersEntries = bidiNetworkHeadersFromC
 exports.cdpNetworkHeadersFromBidiNetworkHeaders = cdpNetworkHeadersFromBidiNetworkHeaders;
 exports.bidiNetworkHeadersFromCdpFetchHeaders = bidiNetworkHeadersFromCdpFetchHeaders;
 exports.cdpFetchHeadersFromBidiNetworkHeaders = cdpFetchHeadersFromBidiNetworkHeaders;
-exports.networkHeaderFromCookieHeaders = networkHeaderFromCookieHeaders;
 exports.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction = cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction;
 exports.cdpToBiDiCookie = cdpToBiDiCookie;
 exports.deserializeByteValue = deserializeByteValue;
@@ -17345,7 +21252,6 @@ exports.sameSiteBiDiToCdp = sameSiteBiDiToCdp;
 exports.isSpecialScheme = isSpecialScheme;
 exports.matchUrlPattern = matchUrlPattern;
 exports.bidiBodySizeFromCdpPostDataEntries = bidiBodySizeFromCdpPostDataEntries;
-exports.getTiming = getTiming;
 const ErrorResponse_js_1 = __webpack_require__(/*! ../../../protocol/ErrorResponse.js */ "./node_modules/chromium-bidi/lib/cjs/protocol/ErrorResponse.js");
 const Base64_js_1 = __webpack_require__(/*! ../../../utils/Base64.js */ "./node_modules/chromium-bidi/lib/cjs/utils/Base64.js");
 const UrlPattern_js_1 = __webpack_require__(/*! ../../../utils/UrlPattern.js */ "./node_modules/chromium-bidi/lib/cjs/utils/UrlPattern.js");
@@ -17414,28 +21320,6 @@ function cdpFetchHeadersFromBidiNetworkHeaders(headers) {
         name,
         value: value.value,
     }));
-}
-function networkHeaderFromCookieHeaders(headers) {
-    if (headers === undefined) {
-        return undefined;
-    }
-    const value = headers.reduce((acc, value, index) => {
-        if (index > 0) {
-            acc += ';';
-        }
-        const cookieValue = value.value.type === 'base64'
-            ? btoa(value.value.value)
-            : value.value.value;
-        acc += `${value.name}=${cookieValue}`;
-        return acc;
-    }, '');
-    return {
-        name: 'Cookie',
-        value: {
-            type: 'string',
-            value,
-        },
-    };
 }
 /** Converts from Bidi auth action to CDP auth challenge response. */
 function cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction(action) {
@@ -17597,15 +21481,6 @@ function bidiBodySizeFromCdpPostDataEntries(entries) {
         size += atob(entry.bytes ?? '').length;
     }
     return size;
-}
-function getTiming(timing) {
-    if (!timing) {
-        return 0;
-    }
-    if (timing < 0) {
-        return 0;
-    }
-    return timing;
 }
 //# sourceMappingURL=NetworkUtils.js.map
 
@@ -19358,7 +23233,7 @@ class SessionProcessor {
     status() {
         return { ready: false, message: 'already connected' };
     }
-    async new(_params) {
+    async create(_params) {
         // Since mapper exists, there is a session already.
         // Still the mapper can handle capabilities for us.
         // Currently, only Puppeteer calls here but, eventually, every client
@@ -22712,7 +26587,7 @@ function save(namespaces) {
 function load() {
 	let r;
 	try {
-		r = exports.storage.getItem('debug') || exports.storage.getItem('DEBUG') ;
+		r = exports.storage.getItem('debug');
 	} catch (error) {
 		// Swallow
 		// XXX (@Qix-) should we be logging these?
@@ -22943,7 +26818,7 @@ function setup(env) {
 
 		const split = (typeof namespaces === 'string' ? namespaces : '')
 			.trim()
-			.replace(/\s+/g, ',')
+			.replace(' ', ',')
 			.split(',')
 			.filter(Boolean);
 
@@ -40291,6 +44166,8 @@ class PacProxyAgent extends agent_base_1.Agent {
     /**
      * Loads the PAC proxy file from the source if necessary, and returns
      * a generated `FindProxyForURL()` resolver function to use.
+     *
+     * @api private
      */
     getResolver() {
         if (!this.resolverPromise) {
@@ -41684,37 +45561,35 @@ const lru_cache_1 = __importDefault(__webpack_require__(/*! lru-cache */ "./node
 const agent_base_1 = __webpack_require__(/*! agent-base */ "./node_modules/agent-base/dist/index.js");
 const debug_1 = __importDefault(__webpack_require__(/*! debug */ "./node_modules/debug/src/index.js"));
 const proxy_from_env_1 = __webpack_require__(/*! proxy-from-env */ "./node_modules/proxy-from-env/index.js");
+const pac_proxy_agent_1 = __webpack_require__(/*! pac-proxy-agent */ "./node_modules/pac-proxy-agent/dist/index.js");
+const http_proxy_agent_1 = __webpack_require__(/*! http-proxy-agent */ "./node_modules/http-proxy-agent/dist/index.js");
+const https_proxy_agent_1 = __webpack_require__(/*! https-proxy-agent */ "./node_modules/https-proxy-agent/dist/index.js");
+const socks_proxy_agent_1 = __webpack_require__(/*! socks-proxy-agent */ "./node_modules/socks-proxy-agent/dist/index.js");
 const debug = (0, debug_1.default)('proxy-agent');
-/**
- * Shorthands for built-in supported types.
- * Lazily loaded since some of these imports can be quite expensive
- * (in particular, pac-proxy-agent).
- */
-const wellKnownAgents = {
-    http: async () => (await Promise.resolve().then(() => __importStar(__webpack_require__(/*! http-proxy-agent */ "./node_modules/http-proxy-agent/dist/index.js")))).HttpProxyAgent,
-    https: async () => (await Promise.resolve().then(() => __importStar(__webpack_require__(/*! https-proxy-agent */ "./node_modules/https-proxy-agent/dist/index.js")))).HttpsProxyAgent,
-    socks: async () => (await Promise.resolve().then(() => __importStar(__webpack_require__(/*! socks-proxy-agent */ "./node_modules/socks-proxy-agent/dist/index.js")))).SocksProxyAgent,
-    pac: async () => (await Promise.resolve().then(() => __importStar(__webpack_require__(/*! pac-proxy-agent */ "./node_modules/pac-proxy-agent/dist/index.js")))).PacProxyAgent,
-};
+const PROTOCOLS = [
+    ...http_proxy_agent_1.HttpProxyAgent.protocols,
+    ...socks_proxy_agent_1.SocksProxyAgent.protocols,
+    ...pac_proxy_agent_1.PacProxyAgent.protocols,
+];
 /**
  * Supported proxy types.
  */
 exports.proxies = {
-    http: [wellKnownAgents.http, wellKnownAgents.https],
-    https: [wellKnownAgents.http, wellKnownAgents.https],
-    socks: [wellKnownAgents.socks, wellKnownAgents.socks],
-    socks4: [wellKnownAgents.socks, wellKnownAgents.socks],
-    socks4a: [wellKnownAgents.socks, wellKnownAgents.socks],
-    socks5: [wellKnownAgents.socks, wellKnownAgents.socks],
-    socks5h: [wellKnownAgents.socks, wellKnownAgents.socks],
-    'pac+data': [wellKnownAgents.pac, wellKnownAgents.pac],
-    'pac+file': [wellKnownAgents.pac, wellKnownAgents.pac],
-    'pac+ftp': [wellKnownAgents.pac, wellKnownAgents.pac],
-    'pac+http': [wellKnownAgents.pac, wellKnownAgents.pac],
-    'pac+https': [wellKnownAgents.pac, wellKnownAgents.pac],
+    http: [http_proxy_agent_1.HttpProxyAgent, https_proxy_agent_1.HttpsProxyAgent],
+    https: [http_proxy_agent_1.HttpProxyAgent, https_proxy_agent_1.HttpsProxyAgent],
+    socks: [socks_proxy_agent_1.SocksProxyAgent, socks_proxy_agent_1.SocksProxyAgent],
+    socks4: [socks_proxy_agent_1.SocksProxyAgent, socks_proxy_agent_1.SocksProxyAgent],
+    socks4a: [socks_proxy_agent_1.SocksProxyAgent, socks_proxy_agent_1.SocksProxyAgent],
+    socks5: [socks_proxy_agent_1.SocksProxyAgent, socks_proxy_agent_1.SocksProxyAgent],
+    socks5h: [socks_proxy_agent_1.SocksProxyAgent, socks_proxy_agent_1.SocksProxyAgent],
+    'pac+data': [pac_proxy_agent_1.PacProxyAgent, pac_proxy_agent_1.PacProxyAgent],
+    'pac+file': [pac_proxy_agent_1.PacProxyAgent, pac_proxy_agent_1.PacProxyAgent],
+    'pac+ftp': [pac_proxy_agent_1.PacProxyAgent, pac_proxy_agent_1.PacProxyAgent],
+    'pac+http': [pac_proxy_agent_1.PacProxyAgent, pac_proxy_agent_1.PacProxyAgent],
+    'pac+https': [pac_proxy_agent_1.PacProxyAgent, pac_proxy_agent_1.PacProxyAgent],
 };
 function isValidProtocol(v) {
-    return Object.keys(exports.proxies).includes(v);
+    return PROTOCOLS.includes(v);
 }
 /**
  * Uses the appropriate `Agent` subclass based off of the "proxy"
@@ -41729,10 +45604,7 @@ class ProxyAgent extends agent_base_1.Agent {
         /**
          * Cache for `Agent` instances.
          */
-        this.cache = new lru_cache_1.default({
-            max: 20,
-            dispose: (agent) => agent.destroy(),
-        });
+        this.cache = new lru_cache_1.default({ max: 20 });
         debug('Creating new ProxyAgent instance: %o', opts);
         this.connectOpts = opts;
         this.httpAgent = opts?.httpAgent || new http.Agent(opts);
@@ -41752,7 +45624,7 @@ class ProxyAgent extends agent_base_1.Agent {
                 : 'http:';
         const host = req.getHeader('host');
         const url = new url_1.URL(req.path, `${protocol}//${host}`).href;
-        const proxy = await this.getProxyForUrl(url, req);
+        const proxy = await this.getProxyForUrl(url);
         if (!proxy) {
             debug('Proxy not enabled for URL: %o', url);
             return secureEndpoint ? this.httpsAgent : this.httpAgent;
@@ -41768,7 +45640,8 @@ class ProxyAgent extends agent_base_1.Agent {
             if (!isValidProtocol(proxyProto)) {
                 throw new Error(`Unsupported protocol for proxy URL: ${proxy}`);
             }
-            const ctor = await exports.proxies[proxyProto][secureEndpoint || isWebSocket ? 1 : 0]();
+            const ctor = exports.proxies[proxyProto][secureEndpoint || isWebSocket ? 1 : 0];
+            // @ts-expect-error meh…
             agent = new ctor(proxy, this.connectOpts);
             this.cache.set(cacheKey, agent);
         }
@@ -42004,6 +45877,30 @@ module.exports = pump
 
 /***/ }),
 
+/***/ "./node_modules/queue-tick/process-next-tick.js":
+/*!******************************************************!*\
+  !*** ./node_modules/queue-tick/process-next-tick.js ***!
+  \******************************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+module.exports = (typeof process !== 'undefined' && typeof process.nextTick === 'function')
+  ? process.nextTick.bind(process)
+  : __webpack_require__(/*! ./queue-microtask */ "./node_modules/queue-tick/queue-microtask.js")
+
+
+/***/ }),
+
+/***/ "./node_modules/queue-tick/queue-microtask.js":
+/*!****************************************************!*\
+  !*** ./node_modules/queue-tick/queue-microtask.js ***!
+  \****************************************************/
+/***/ ((module) => {
+
+module.exports = typeof queueMicrotask === 'function' ? queueMicrotask : (fn) => Promise.resolve().then(fn)
+
+
+/***/ }),
+
 /***/ "./node_modules/require-directory/index.js":
 /*!*************************************************!*\
   !*** ./node_modules/require-directory/index.js ***!
@@ -42097,2837 +45994,6 @@ function requireDirectory(m, path, options) {
 
 module.exports = requireDirectory;
 module.exports.defaults = defaultOptions;
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/classes/comparator.js":
-/*!***************************************************!*\
-  !*** ./node_modules/semver/classes/comparator.js ***!
-  \***************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const ANY = Symbol('SemVer ANY')
-// hoisted class for cyclic dependency
-class Comparator {
-  static get ANY () {
-    return ANY
-  }
-
-  constructor (comp, options) {
-    options = parseOptions(options)
-
-    if (comp instanceof Comparator) {
-      if (comp.loose === !!options.loose) {
-        return comp
-      } else {
-        comp = comp.value
-      }
-    }
-
-    comp = comp.trim().split(/\s+/).join(' ')
-    debug('comparator', comp, options)
-    this.options = options
-    this.loose = !!options.loose
-    this.parse(comp)
-
-    if (this.semver === ANY) {
-      this.value = ''
-    } else {
-      this.value = this.operator + this.semver.version
-    }
-
-    debug('comp', this)
-  }
-
-  parse (comp) {
-    const r = this.options.loose ? re[t.COMPARATORLOOSE] : re[t.COMPARATOR]
-    const m = comp.match(r)
-
-    if (!m) {
-      throw new TypeError(`Invalid comparator: ${comp}`)
-    }
-
-    this.operator = m[1] !== undefined ? m[1] : ''
-    if (this.operator === '=') {
-      this.operator = ''
-    }
-
-    // if it literally is just '>' or '' then allow anything.
-    if (!m[2]) {
-      this.semver = ANY
-    } else {
-      this.semver = new SemVer(m[2], this.options.loose)
-    }
-  }
-
-  toString () {
-    return this.value
-  }
-
-  test (version) {
-    debug('Comparator.test', version, this.options.loose)
-
-    if (this.semver === ANY || version === ANY) {
-      return true
-    }
-
-    if (typeof version === 'string') {
-      try {
-        version = new SemVer(version, this.options)
-      } catch (er) {
-        return false
-      }
-    }
-
-    return cmp(version, this.operator, this.semver, this.options)
-  }
-
-  intersects (comp, options) {
-    if (!(comp instanceof Comparator)) {
-      throw new TypeError('a Comparator is required')
-    }
-
-    if (this.operator === '') {
-      if (this.value === '') {
-        return true
-      }
-      return new Range(comp.value, options).test(this.value)
-    } else if (comp.operator === '') {
-      if (comp.value === '') {
-        return true
-      }
-      return new Range(this.value, options).test(comp.semver)
-    }
-
-    options = parseOptions(options)
-
-    // Special cases where nothing can possibly be lower
-    if (options.includePrerelease &&
-      (this.value === '<0.0.0-0' || comp.value === '<0.0.0-0')) {
-      return false
-    }
-    if (!options.includePrerelease &&
-      (this.value.startsWith('<0.0.0') || comp.value.startsWith('<0.0.0'))) {
-      return false
-    }
-
-    // Same direction increasing (> or >=)
-    if (this.operator.startsWith('>') && comp.operator.startsWith('>')) {
-      return true
-    }
-    // Same direction decreasing (< or <=)
-    if (this.operator.startsWith('<') && comp.operator.startsWith('<')) {
-      return true
-    }
-    // same SemVer and both sides are inclusive (<= or >=)
-    if (
-      (this.semver.version === comp.semver.version) &&
-      this.operator.includes('=') && comp.operator.includes('=')) {
-      return true
-    }
-    // opposite directions less than
-    if (cmp(this.semver, '<', comp.semver, options) &&
-      this.operator.startsWith('>') && comp.operator.startsWith('<')) {
-      return true
-    }
-    // opposite directions greater than
-    if (cmp(this.semver, '>', comp.semver, options) &&
-      this.operator.startsWith('<') && comp.operator.startsWith('>')) {
-      return true
-    }
-    return false
-  }
-}
-
-module.exports = Comparator
-
-const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/semver/internal/parse-options.js")
-const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/semver/internal/re.js")
-const cmp = __webpack_require__(/*! ../functions/cmp */ "./node_modules/semver/functions/cmp.js")
-const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/semver/internal/debug.js")
-const SemVer = __webpack_require__(/*! ./semver */ "./node_modules/semver/classes/semver.js")
-const Range = __webpack_require__(/*! ./range */ "./node_modules/semver/classes/range.js")
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/classes/range.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/classes/range.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SPACE_CHARACTERS = /\s+/g
-
-// hoisted class for cyclic dependency
-class Range {
-  constructor (range, options) {
-    options = parseOptions(options)
-
-    if (range instanceof Range) {
-      if (
-        range.loose === !!options.loose &&
-        range.includePrerelease === !!options.includePrerelease
-      ) {
-        return range
-      } else {
-        return new Range(range.raw, options)
-      }
-    }
-
-    if (range instanceof Comparator) {
-      // just put it in the set and return
-      this.raw = range.value
-      this.set = [[range]]
-      this.formatted = undefined
-      return this
-    }
-
-    this.options = options
-    this.loose = !!options.loose
-    this.includePrerelease = !!options.includePrerelease
-
-    // First reduce all whitespace as much as possible so we do not have to rely
-    // on potentially slow regexes like \s*. This is then stored and used for
-    // future error messages as well.
-    this.raw = range.trim().replace(SPACE_CHARACTERS, ' ')
-
-    // First, split on ||
-    this.set = this.raw
-      .split('||')
-      // map the range to a 2d array of comparators
-      .map(r => this.parseRange(r.trim()))
-      // throw out any comparator lists that are empty
-      // this generally means that it was not a valid range, which is allowed
-      // in loose mode, but will still throw if the WHOLE range is invalid.
-      .filter(c => c.length)
-
-    if (!this.set.length) {
-      throw new TypeError(`Invalid SemVer Range: ${this.raw}`)
-    }
-
-    // if we have any that are not the null set, throw out null sets.
-    if (this.set.length > 1) {
-      // keep the first one, in case they're all null sets
-      const first = this.set[0]
-      this.set = this.set.filter(c => !isNullSet(c[0]))
-      if (this.set.length === 0) {
-        this.set = [first]
-      } else if (this.set.length > 1) {
-        // if we have any that are *, then the range is just *
-        for (const c of this.set) {
-          if (c.length === 1 && isAny(c[0])) {
-            this.set = [c]
-            break
-          }
-        }
-      }
-    }
-
-    this.formatted = undefined
-  }
-
-  get range () {
-    if (this.formatted === undefined) {
-      this.formatted = ''
-      for (let i = 0; i < this.set.length; i++) {
-        if (i > 0) {
-          this.formatted += '||'
-        }
-        const comps = this.set[i]
-        for (let k = 0; k < comps.length; k++) {
-          if (k > 0) {
-            this.formatted += ' '
-          }
-          this.formatted += comps[k].toString().trim()
-        }
-      }
-    }
-    return this.formatted
-  }
-
-  format () {
-    return this.range
-  }
-
-  toString () {
-    return this.range
-  }
-
-  parseRange (range) {
-    // memoize range parsing for performance.
-    // this is a very hot path, and fully deterministic.
-    const memoOpts =
-      (this.options.includePrerelease && FLAG_INCLUDE_PRERELEASE) |
-      (this.options.loose && FLAG_LOOSE)
-    const memoKey = memoOpts + ':' + range
-    const cached = cache.get(memoKey)
-    if (cached) {
-      return cached
-    }
-
-    const loose = this.options.loose
-    // `1.2.3 - 1.2.4` => `>=1.2.3 <=1.2.4`
-    const hr = loose ? re[t.HYPHENRANGELOOSE] : re[t.HYPHENRANGE]
-    range = range.replace(hr, hyphenReplace(this.options.includePrerelease))
-    debug('hyphen replace', range)
-
-    // `> 1.2.3 < 1.2.5` => `>1.2.3 <1.2.5`
-    range = range.replace(re[t.COMPARATORTRIM], comparatorTrimReplace)
-    debug('comparator trim', range)
-
-    // `~ 1.2.3` => `~1.2.3`
-    range = range.replace(re[t.TILDETRIM], tildeTrimReplace)
-    debug('tilde trim', range)
-
-    // `^ 1.2.3` => `^1.2.3`
-    range = range.replace(re[t.CARETTRIM], caretTrimReplace)
-    debug('caret trim', range)
-
-    // At this point, the range is completely trimmed and
-    // ready to be split into comparators.
-
-    let rangeList = range
-      .split(' ')
-      .map(comp => parseComparator(comp, this.options))
-      .join(' ')
-      .split(/\s+/)
-      // >=0.0.0 is equivalent to *
-      .map(comp => replaceGTE0(comp, this.options))
-
-    if (loose) {
-      // in loose mode, throw out any that are not valid comparators
-      rangeList = rangeList.filter(comp => {
-        debug('loose invalid filter', comp, this.options)
-        return !!comp.match(re[t.COMPARATORLOOSE])
-      })
-    }
-    debug('range list', rangeList)
-
-    // if any comparators are the null set, then replace with JUST null set
-    // if more than one comparator, remove any * comparators
-    // also, don't include the same comparator more than once
-    const rangeMap = new Map()
-    const comparators = rangeList.map(comp => new Comparator(comp, this.options))
-    for (const comp of comparators) {
-      if (isNullSet(comp)) {
-        return [comp]
-      }
-      rangeMap.set(comp.value, comp)
-    }
-    if (rangeMap.size > 1 && rangeMap.has('')) {
-      rangeMap.delete('')
-    }
-
-    const result = [...rangeMap.values()]
-    cache.set(memoKey, result)
-    return result
-  }
-
-  intersects (range, options) {
-    if (!(range instanceof Range)) {
-      throw new TypeError('a Range is required')
-    }
-
-    return this.set.some((thisComparators) => {
-      return (
-        isSatisfiable(thisComparators, options) &&
-        range.set.some((rangeComparators) => {
-          return (
-            isSatisfiable(rangeComparators, options) &&
-            thisComparators.every((thisComparator) => {
-              return rangeComparators.every((rangeComparator) => {
-                return thisComparator.intersects(rangeComparator, options)
-              })
-            })
-          )
-        })
-      )
-    })
-  }
-
-  // if ANY of the sets match ALL of its comparators, then pass
-  test (version) {
-    if (!version) {
-      return false
-    }
-
-    if (typeof version === 'string') {
-      try {
-        version = new SemVer(version, this.options)
-      } catch (er) {
-        return false
-      }
-    }
-
-    for (let i = 0; i < this.set.length; i++) {
-      if (testSet(this.set[i], version, this.options)) {
-        return true
-      }
-    }
-    return false
-  }
-}
-
-module.exports = Range
-
-const LRU = __webpack_require__(/*! ../internal/lrucache */ "./node_modules/semver/internal/lrucache.js")
-const cache = new LRU()
-
-const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/semver/internal/parse-options.js")
-const Comparator = __webpack_require__(/*! ./comparator */ "./node_modules/semver/classes/comparator.js")
-const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/semver/internal/debug.js")
-const SemVer = __webpack_require__(/*! ./semver */ "./node_modules/semver/classes/semver.js")
-const {
-  safeRe: re,
-  t,
-  comparatorTrimReplace,
-  tildeTrimReplace,
-  caretTrimReplace,
-} = __webpack_require__(/*! ../internal/re */ "./node_modules/semver/internal/re.js")
-const { FLAG_INCLUDE_PRERELEASE, FLAG_LOOSE } = __webpack_require__(/*! ../internal/constants */ "./node_modules/semver/internal/constants.js")
-
-const isNullSet = c => c.value === '<0.0.0-0'
-const isAny = c => c.value === ''
-
-// take a set of comparators and determine whether there
-// exists a version which can satisfy it
-const isSatisfiable = (comparators, options) => {
-  let result = true
-  const remainingComparators = comparators.slice()
-  let testComparator = remainingComparators.pop()
-
-  while (result && remainingComparators.length) {
-    result = remainingComparators.every((otherComparator) => {
-      return testComparator.intersects(otherComparator, options)
-    })
-
-    testComparator = remainingComparators.pop()
-  }
-
-  return result
-}
-
-// comprised of xranges, tildes, stars, and gtlt's at this point.
-// already replaced the hyphen ranges
-// turn into a set of JUST comparators.
-const parseComparator = (comp, options) => {
-  debug('comp', comp, options)
-  comp = replaceCarets(comp, options)
-  debug('caret', comp)
-  comp = replaceTildes(comp, options)
-  debug('tildes', comp)
-  comp = replaceXRanges(comp, options)
-  debug('xrange', comp)
-  comp = replaceStars(comp, options)
-  debug('stars', comp)
-  return comp
-}
-
-const isX = id => !id || id.toLowerCase() === 'x' || id === '*'
-
-// ~, ~> --> * (any, kinda silly)
-// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0 <3.0.0-0
-// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0 <2.1.0-0
-// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0 <1.3.0-0
-// ~1.2.3, ~>1.2.3 --> >=1.2.3 <1.3.0-0
-// ~1.2.0, ~>1.2.0 --> >=1.2.0 <1.3.0-0
-// ~0.0.1 --> >=0.0.1 <0.1.0-0
-const replaceTildes = (comp, options) => {
-  return comp
-    .trim()
-    .split(/\s+/)
-    .map((c) => replaceTilde(c, options))
-    .join(' ')
-}
-
-const replaceTilde = (comp, options) => {
-  const r = options.loose ? re[t.TILDELOOSE] : re[t.TILDE]
-  return comp.replace(r, (_, M, m, p, pr) => {
-    debug('tilde', comp, _, M, m, p, pr)
-    let ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = `>=${M}.0.0 <${+M + 1}.0.0-0`
-    } else if (isX(p)) {
-      // ~1.2 == >=1.2.0 <1.3.0-0
-      ret = `>=${M}.${m}.0 <${M}.${+m + 1}.0-0`
-    } else if (pr) {
-      debug('replaceTilde pr', pr)
-      ret = `>=${M}.${m}.${p}-${pr
-      } <${M}.${+m + 1}.0-0`
-    } else {
-      // ~1.2.3 == >=1.2.3 <1.3.0-0
-      ret = `>=${M}.${m}.${p
-      } <${M}.${+m + 1}.0-0`
-    }
-
-    debug('tilde return', ret)
-    return ret
-  })
-}
-
-// ^ --> * (any, kinda silly)
-// ^2, ^2.x, ^2.x.x --> >=2.0.0 <3.0.0-0
-// ^2.0, ^2.0.x --> >=2.0.0 <3.0.0-0
-// ^1.2, ^1.2.x --> >=1.2.0 <2.0.0-0
-// ^1.2.3 --> >=1.2.3 <2.0.0-0
-// ^1.2.0 --> >=1.2.0 <2.0.0-0
-// ^0.0.1 --> >=0.0.1 <0.0.2-0
-// ^0.1.0 --> >=0.1.0 <0.2.0-0
-const replaceCarets = (comp, options) => {
-  return comp
-    .trim()
-    .split(/\s+/)
-    .map((c) => replaceCaret(c, options))
-    .join(' ')
-}
-
-const replaceCaret = (comp, options) => {
-  debug('caret', comp, options)
-  const r = options.loose ? re[t.CARETLOOSE] : re[t.CARET]
-  const z = options.includePrerelease ? '-0' : ''
-  return comp.replace(r, (_, M, m, p, pr) => {
-    debug('caret', comp, _, M, m, p, pr)
-    let ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = `>=${M}.0.0${z} <${+M + 1}.0.0-0`
-    } else if (isX(p)) {
-      if (M === '0') {
-        ret = `>=${M}.${m}.0${z} <${M}.${+m + 1}.0-0`
-      } else {
-        ret = `>=${M}.${m}.0${z} <${+M + 1}.0.0-0`
-      }
-    } else if (pr) {
-      debug('replaceCaret pr', pr)
-      if (M === '0') {
-        if (m === '0') {
-          ret = `>=${M}.${m}.${p}-${pr
-          } <${M}.${m}.${+p + 1}-0`
-        } else {
-          ret = `>=${M}.${m}.${p}-${pr
-          } <${M}.${+m + 1}.0-0`
-        }
-      } else {
-        ret = `>=${M}.${m}.${p}-${pr
-        } <${+M + 1}.0.0-0`
-      }
-    } else {
-      debug('no pr')
-      if (M === '0') {
-        if (m === '0') {
-          ret = `>=${M}.${m}.${p
-          }${z} <${M}.${m}.${+p + 1}-0`
-        } else {
-          ret = `>=${M}.${m}.${p
-          }${z} <${M}.${+m + 1}.0-0`
-        }
-      } else {
-        ret = `>=${M}.${m}.${p
-        } <${+M + 1}.0.0-0`
-      }
-    }
-
-    debug('caret return', ret)
-    return ret
-  })
-}
-
-const replaceXRanges = (comp, options) => {
-  debug('replaceXRanges', comp, options)
-  return comp
-    .split(/\s+/)
-    .map((c) => replaceXRange(c, options))
-    .join(' ')
-}
-
-const replaceXRange = (comp, options) => {
-  comp = comp.trim()
-  const r = options.loose ? re[t.XRANGELOOSE] : re[t.XRANGE]
-  return comp.replace(r, (ret, gtlt, M, m, p, pr) => {
-    debug('xRange', comp, ret, gtlt, M, m, p, pr)
-    const xM = isX(M)
-    const xm = xM || isX(m)
-    const xp = xm || isX(p)
-    const anyX = xp
-
-    if (gtlt === '=' && anyX) {
-      gtlt = ''
-    }
-
-    // if we're including prereleases in the match, then we need
-    // to fix this to -0, the lowest possible prerelease value
-    pr = options.includePrerelease ? '-0' : ''
-
-    if (xM) {
-      if (gtlt === '>' || gtlt === '<') {
-        // nothing is allowed
-        ret = '<0.0.0-0'
-      } else {
-        // nothing is forbidden
-        ret = '*'
-      }
-    } else if (gtlt && anyX) {
-      // we know patch is an x, because we have any x at all.
-      // replace X with 0
-      if (xm) {
-        m = 0
-      }
-      p = 0
-
-      if (gtlt === '>') {
-        // >1 => >=2.0.0
-        // >1.2 => >=1.3.0
-        gtlt = '>='
-        if (xm) {
-          M = +M + 1
-          m = 0
-          p = 0
-        } else {
-          m = +m + 1
-          p = 0
-        }
-      } else if (gtlt === '<=') {
-        // <=0.7.x is actually <0.8.0, since any 0.7.x should
-        // pass.  Similarly, <=7.x is actually <8.0.0, etc.
-        gtlt = '<'
-        if (xm) {
-          M = +M + 1
-        } else {
-          m = +m + 1
-        }
-      }
-
-      if (gtlt === '<') {
-        pr = '-0'
-      }
-
-      ret = `${gtlt + M}.${m}.${p}${pr}`
-    } else if (xm) {
-      ret = `>=${M}.0.0${pr} <${+M + 1}.0.0-0`
-    } else if (xp) {
-      ret = `>=${M}.${m}.0${pr
-      } <${M}.${+m + 1}.0-0`
-    }
-
-    debug('xRange return', ret)
-
-    return ret
-  })
-}
-
-// Because * is AND-ed with everything else in the comparator,
-// and '' means "any version", just remove the *s entirely.
-const replaceStars = (comp, options) => {
-  debug('replaceStars', comp, options)
-  // Looseness is ignored here.  star is always as loose as it gets!
-  return comp
-    .trim()
-    .replace(re[t.STAR], '')
-}
-
-const replaceGTE0 = (comp, options) => {
-  debug('replaceGTE0', comp, options)
-  return comp
-    .trim()
-    .replace(re[options.includePrerelease ? t.GTE0PRE : t.GTE0], '')
-}
-
-// This function is passed to string.replace(re[t.HYPHENRANGE])
-// M, m, patch, prerelease, build
-// 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
-// 1.2.3 - 3.4 => >=1.2.0 <3.5.0-0 Any 3.4.x will do
-// 1.2 - 3.4 => >=1.2.0 <3.5.0-0
-// TODO build?
-const hyphenReplace = incPr => ($0,
-  from, fM, fm, fp, fpr, fb,
-  to, tM, tm, tp, tpr) => {
-  if (isX(fM)) {
-    from = ''
-  } else if (isX(fm)) {
-    from = `>=${fM}.0.0${incPr ? '-0' : ''}`
-  } else if (isX(fp)) {
-    from = `>=${fM}.${fm}.0${incPr ? '-0' : ''}`
-  } else if (fpr) {
-    from = `>=${from}`
-  } else {
-    from = `>=${from}${incPr ? '-0' : ''}`
-  }
-
-  if (isX(tM)) {
-    to = ''
-  } else if (isX(tm)) {
-    to = `<${+tM + 1}.0.0-0`
-  } else if (isX(tp)) {
-    to = `<${tM}.${+tm + 1}.0-0`
-  } else if (tpr) {
-    to = `<=${tM}.${tm}.${tp}-${tpr}`
-  } else if (incPr) {
-    to = `<${tM}.${tm}.${+tp + 1}-0`
-  } else {
-    to = `<=${to}`
-  }
-
-  return `${from} ${to}`.trim()
-}
-
-const testSet = (set, version, options) => {
-  for (let i = 0; i < set.length; i++) {
-    if (!set[i].test(version)) {
-      return false
-    }
-  }
-
-  if (version.prerelease.length && !options.includePrerelease) {
-    // Find the set of versions that are allowed to have prereleases
-    // For example, ^1.2.3-pr.1 desugars to >=1.2.3-pr.1 <2.0.0
-    // That should allow `1.2.3-pr.2` to pass.
-    // However, `1.2.4-alpha.notready` should NOT be allowed,
-    // even though it's within the range set by the comparators.
-    for (let i = 0; i < set.length; i++) {
-      debug(set[i].semver)
-      if (set[i].semver === Comparator.ANY) {
-        continue
-      }
-
-      if (set[i].semver.prerelease.length > 0) {
-        const allowed = set[i].semver
-        if (allowed.major === version.major &&
-            allowed.minor === version.minor &&
-            allowed.patch === version.patch) {
-          return true
-        }
-      }
-    }
-
-    // Version has a -pre, but it's not one of the ones we like.
-    return false
-  }
-
-  return true
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/classes/semver.js":
-/*!***********************************************!*\
-  !*** ./node_modules/semver/classes/semver.js ***!
-  \***********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const debug = __webpack_require__(/*! ../internal/debug */ "./node_modules/semver/internal/debug.js")
-const { MAX_LENGTH, MAX_SAFE_INTEGER } = __webpack_require__(/*! ../internal/constants */ "./node_modules/semver/internal/constants.js")
-const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/semver/internal/re.js")
-
-const parseOptions = __webpack_require__(/*! ../internal/parse-options */ "./node_modules/semver/internal/parse-options.js")
-const { compareIdentifiers } = __webpack_require__(/*! ../internal/identifiers */ "./node_modules/semver/internal/identifiers.js")
-class SemVer {
-  constructor (version, options) {
-    options = parseOptions(options)
-
-    if (version instanceof SemVer) {
-      if (version.loose === !!options.loose &&
-        version.includePrerelease === !!options.includePrerelease) {
-        return version
-      } else {
-        version = version.version
-      }
-    } else if (typeof version !== 'string') {
-      throw new TypeError(`Invalid version. Must be a string. Got type "${typeof version}".`)
-    }
-
-    if (version.length > MAX_LENGTH) {
-      throw new TypeError(
-        `version is longer than ${MAX_LENGTH} characters`
-      )
-    }
-
-    debug('SemVer', version, options)
-    this.options = options
-    this.loose = !!options.loose
-    // this isn't actually relevant for versions, but keep it so that we
-    // don't run into trouble passing this.options around.
-    this.includePrerelease = !!options.includePrerelease
-
-    const m = version.trim().match(options.loose ? re[t.LOOSE] : re[t.FULL])
-
-    if (!m) {
-      throw new TypeError(`Invalid Version: ${version}`)
-    }
-
-    this.raw = version
-
-    // these are actually numbers
-    this.major = +m[1]
-    this.minor = +m[2]
-    this.patch = +m[3]
-
-    if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
-      throw new TypeError('Invalid major version')
-    }
-
-    if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
-      throw new TypeError('Invalid minor version')
-    }
-
-    if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
-      throw new TypeError('Invalid patch version')
-    }
-
-    // numberify any prerelease numeric ids
-    if (!m[4]) {
-      this.prerelease = []
-    } else {
-      this.prerelease = m[4].split('.').map((id) => {
-        if (/^[0-9]+$/.test(id)) {
-          const num = +id
-          if (num >= 0 && num < MAX_SAFE_INTEGER) {
-            return num
-          }
-        }
-        return id
-      })
-    }
-
-    this.build = m[5] ? m[5].split('.') : []
-    this.format()
-  }
-
-  format () {
-    this.version = `${this.major}.${this.minor}.${this.patch}`
-    if (this.prerelease.length) {
-      this.version += `-${this.prerelease.join('.')}`
-    }
-    return this.version
-  }
-
-  toString () {
-    return this.version
-  }
-
-  compare (other) {
-    debug('SemVer.compare', this.version, this.options, other)
-    if (!(other instanceof SemVer)) {
-      if (typeof other === 'string' && other === this.version) {
-        return 0
-      }
-      other = new SemVer(other, this.options)
-    }
-
-    if (other.version === this.version) {
-      return 0
-    }
-
-    return this.compareMain(other) || this.comparePre(other)
-  }
-
-  compareMain (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    return (
-      compareIdentifiers(this.major, other.major) ||
-      compareIdentifiers(this.minor, other.minor) ||
-      compareIdentifiers(this.patch, other.patch)
-    )
-  }
-
-  comparePre (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    // NOT having a prerelease is > having one
-    if (this.prerelease.length && !other.prerelease.length) {
-      return -1
-    } else if (!this.prerelease.length && other.prerelease.length) {
-      return 1
-    } else if (!this.prerelease.length && !other.prerelease.length) {
-      return 0
-    }
-
-    let i = 0
-    do {
-      const a = this.prerelease[i]
-      const b = other.prerelease[i]
-      debug('prerelease compare', i, a, b)
-      if (a === undefined && b === undefined) {
-        return 0
-      } else if (b === undefined) {
-        return 1
-      } else if (a === undefined) {
-        return -1
-      } else if (a === b) {
-        continue
-      } else {
-        return compareIdentifiers(a, b)
-      }
-    } while (++i)
-  }
-
-  compareBuild (other) {
-    if (!(other instanceof SemVer)) {
-      other = new SemVer(other, this.options)
-    }
-
-    let i = 0
-    do {
-      const a = this.build[i]
-      const b = other.build[i]
-      debug('build compare', i, a, b)
-      if (a === undefined && b === undefined) {
-        return 0
-      } else if (b === undefined) {
-        return 1
-      } else if (a === undefined) {
-        return -1
-      } else if (a === b) {
-        continue
-      } else {
-        return compareIdentifiers(a, b)
-      }
-    } while (++i)
-  }
-
-  // preminor will bump the version up to the next minor release, and immediately
-  // down to pre-release. premajor and prepatch work the same way.
-  inc (release, identifier, identifierBase) {
-    if (release.startsWith('pre')) {
-      if (!identifier && identifierBase === false) {
-        throw new Error('invalid increment argument: identifier is empty')
-      }
-      // Avoid an invalid semver results
-      if (identifier) {
-        const match = `-${identifier}`.match(this.options.loose ? re[t.PRERELEASELOOSE] : re[t.PRERELEASE])
-        if (!match || match[1] !== identifier) {
-          throw new Error(`invalid identifier: ${identifier}`)
-        }
-      }
-    }
-
-    switch (release) {
-      case 'premajor':
-        this.prerelease.length = 0
-        this.patch = 0
-        this.minor = 0
-        this.major++
-        this.inc('pre', identifier, identifierBase)
-        break
-      case 'preminor':
-        this.prerelease.length = 0
-        this.patch = 0
-        this.minor++
-        this.inc('pre', identifier, identifierBase)
-        break
-      case 'prepatch':
-        // If this is already a prerelease, it will bump to the next version
-        // drop any prereleases that might already exist, since they are not
-        // relevant at this point.
-        this.prerelease.length = 0
-        this.inc('patch', identifier, identifierBase)
-        this.inc('pre', identifier, identifierBase)
-        break
-      // If the input is a non-prerelease version, this acts the same as
-      // prepatch.
-      case 'prerelease':
-        if (this.prerelease.length === 0) {
-          this.inc('patch', identifier, identifierBase)
-        }
-        this.inc('pre', identifier, identifierBase)
-        break
-      case 'release':
-        if (this.prerelease.length === 0) {
-          throw new Error(`version ${this.raw} is not a prerelease`)
-        }
-        this.prerelease.length = 0
-        break
-
-      case 'major':
-        // If this is a pre-major version, bump up to the same major version.
-        // Otherwise increment major.
-        // 1.0.0-5 bumps to 1.0.0
-        // 1.1.0 bumps to 2.0.0
-        if (
-          this.minor !== 0 ||
-          this.patch !== 0 ||
-          this.prerelease.length === 0
-        ) {
-          this.major++
-        }
-        this.minor = 0
-        this.patch = 0
-        this.prerelease = []
-        break
-      case 'minor':
-        // If this is a pre-minor version, bump up to the same minor version.
-        // Otherwise increment minor.
-        // 1.2.0-5 bumps to 1.2.0
-        // 1.2.1 bumps to 1.3.0
-        if (this.patch !== 0 || this.prerelease.length === 0) {
-          this.minor++
-        }
-        this.patch = 0
-        this.prerelease = []
-        break
-      case 'patch':
-        // If this is not a pre-release version, it will increment the patch.
-        // If it is a pre-release it will bump up to the same patch version.
-        // 1.2.0-5 patches to 1.2.0
-        // 1.2.0 patches to 1.2.1
-        if (this.prerelease.length === 0) {
-          this.patch++
-        }
-        this.prerelease = []
-        break
-      // This probably shouldn't be used publicly.
-      // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
-      case 'pre': {
-        const base = Number(identifierBase) ? 1 : 0
-
-        if (this.prerelease.length === 0) {
-          this.prerelease = [base]
-        } else {
-          let i = this.prerelease.length
-          while (--i >= 0) {
-            if (typeof this.prerelease[i] === 'number') {
-              this.prerelease[i]++
-              i = -2
-            }
-          }
-          if (i === -1) {
-            // didn't increment anything
-            if (identifier === this.prerelease.join('.') && identifierBase === false) {
-              throw new Error('invalid increment argument: identifier already exists')
-            }
-            this.prerelease.push(base)
-          }
-        }
-        if (identifier) {
-          // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
-          // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
-          let prerelease = [identifier, base]
-          if (identifierBase === false) {
-            prerelease = [identifier]
-          }
-          if (compareIdentifiers(this.prerelease[0], identifier) === 0) {
-            if (isNaN(this.prerelease[1])) {
-              this.prerelease = prerelease
-            }
-          } else {
-            this.prerelease = prerelease
-          }
-        }
-        break
-      }
-      default:
-        throw new Error(`invalid increment argument: ${release}`)
-    }
-    this.raw = this.format()
-    if (this.build.length) {
-      this.raw += `+${this.build.join('.')}`
-    }
-    return this
-  }
-}
-
-module.exports = SemVer
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/clean.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/clean.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const parse = __webpack_require__(/*! ./parse */ "./node_modules/semver/functions/parse.js")
-const clean = (version, options) => {
-  const s = parse(version.trim().replace(/^[=v]+/, ''), options)
-  return s ? s.version : null
-}
-module.exports = clean
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/cmp.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/functions/cmp.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const eq = __webpack_require__(/*! ./eq */ "./node_modules/semver/functions/eq.js")
-const neq = __webpack_require__(/*! ./neq */ "./node_modules/semver/functions/neq.js")
-const gt = __webpack_require__(/*! ./gt */ "./node_modules/semver/functions/gt.js")
-const gte = __webpack_require__(/*! ./gte */ "./node_modules/semver/functions/gte.js")
-const lt = __webpack_require__(/*! ./lt */ "./node_modules/semver/functions/lt.js")
-const lte = __webpack_require__(/*! ./lte */ "./node_modules/semver/functions/lte.js")
-
-const cmp = (a, op, b, loose) => {
-  switch (op) {
-    case '===':
-      if (typeof a === 'object') {
-        a = a.version
-      }
-      if (typeof b === 'object') {
-        b = b.version
-      }
-      return a === b
-
-    case '!==':
-      if (typeof a === 'object') {
-        a = a.version
-      }
-      if (typeof b === 'object') {
-        b = b.version
-      }
-      return a !== b
-
-    case '':
-    case '=':
-    case '==':
-      return eq(a, b, loose)
-
-    case '!=':
-      return neq(a, b, loose)
-
-    case '>':
-      return gt(a, b, loose)
-
-    case '>=':
-      return gte(a, b, loose)
-
-    case '<':
-      return lt(a, b, loose)
-
-    case '<=':
-      return lte(a, b, loose)
-
-    default:
-      throw new TypeError(`Invalid operator: ${op}`)
-  }
-}
-module.exports = cmp
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/coerce.js":
-/*!*************************************************!*\
-  !*** ./node_modules/semver/functions/coerce.js ***!
-  \*************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const parse = __webpack_require__(/*! ./parse */ "./node_modules/semver/functions/parse.js")
-const { safeRe: re, t } = __webpack_require__(/*! ../internal/re */ "./node_modules/semver/internal/re.js")
-
-const coerce = (version, options) => {
-  if (version instanceof SemVer) {
-    return version
-  }
-
-  if (typeof version === 'number') {
-    version = String(version)
-  }
-
-  if (typeof version !== 'string') {
-    return null
-  }
-
-  options = options || {}
-
-  let match = null
-  if (!options.rtl) {
-    match = version.match(options.includePrerelease ? re[t.COERCEFULL] : re[t.COERCE])
-  } else {
-    // Find the right-most coercible string that does not share
-    // a terminus with a more left-ward coercible string.
-    // Eg, '1.2.3.4' wants to coerce '2.3.4', not '3.4' or '4'
-    // With includePrerelease option set, '1.2.3.4-rc' wants to coerce '2.3.4-rc', not '2.3.4'
-    //
-    // Walk through the string checking with a /g regexp
-    // Manually set the index so as to pick up overlapping matches.
-    // Stop when we get a match that ends at the string end, since no
-    // coercible string can be more right-ward without the same terminus.
-    const coerceRtlRegex = options.includePrerelease ? re[t.COERCERTLFULL] : re[t.COERCERTL]
-    let next
-    while ((next = coerceRtlRegex.exec(version)) &&
-        (!match || match.index + match[0].length !== version.length)
-    ) {
-      if (!match ||
-            next.index + next[0].length !== match.index + match[0].length) {
-        match = next
-      }
-      coerceRtlRegex.lastIndex = next.index + next[1].length + next[2].length
-    }
-    // leave it in a clean state
-    coerceRtlRegex.lastIndex = -1
-  }
-
-  if (match === null) {
-    return null
-  }
-
-  const major = match[2]
-  const minor = match[3] || '0'
-  const patch = match[4] || '0'
-  const prerelease = options.includePrerelease && match[5] ? `-${match[5]}` : ''
-  const build = options.includePrerelease && match[6] ? `+${match[6]}` : ''
-
-  return parse(`${major}.${minor}.${patch}${prerelease}${build}`, options)
-}
-module.exports = coerce
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/compare-build.js":
-/*!********************************************************!*\
-  !*** ./node_modules/semver/functions/compare-build.js ***!
-  \********************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const compareBuild = (a, b, loose) => {
-  const versionA = new SemVer(a, loose)
-  const versionB = new SemVer(b, loose)
-  return versionA.compare(versionB) || versionA.compareBuild(versionB)
-}
-module.exports = compareBuild
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/compare-loose.js":
-/*!********************************************************!*\
-  !*** ./node_modules/semver/functions/compare-loose.js ***!
-  \********************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const compareLoose = (a, b) => compare(a, b, true)
-module.exports = compareLoose
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/compare.js":
-/*!**************************************************!*\
-  !*** ./node_modules/semver/functions/compare.js ***!
-  \**************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const compare = (a, b, loose) =>
-  new SemVer(a, loose).compare(new SemVer(b, loose))
-
-module.exports = compare
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/diff.js":
-/*!***********************************************!*\
-  !*** ./node_modules/semver/functions/diff.js ***!
-  \***********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const parse = __webpack_require__(/*! ./parse.js */ "./node_modules/semver/functions/parse.js")
-
-const diff = (version1, version2) => {
-  const v1 = parse(version1, null, true)
-  const v2 = parse(version2, null, true)
-  const comparison = v1.compare(v2)
-
-  if (comparison === 0) {
-    return null
-  }
-
-  const v1Higher = comparison > 0
-  const highVersion = v1Higher ? v1 : v2
-  const lowVersion = v1Higher ? v2 : v1
-  const highHasPre = !!highVersion.prerelease.length
-  const lowHasPre = !!lowVersion.prerelease.length
-
-  if (lowHasPre && !highHasPre) {
-    // Going from prerelease -> no prerelease requires some special casing
-
-    // If the low version has only a major, then it will always be a major
-    // Some examples:
-    // 1.0.0-1 -> 1.0.0
-    // 1.0.0-1 -> 1.1.1
-    // 1.0.0-1 -> 2.0.0
-    if (!lowVersion.patch && !lowVersion.minor) {
-      return 'major'
-    }
-
-    // If the main part has no difference
-    if (lowVersion.compareMain(highVersion) === 0) {
-      if (lowVersion.minor && !lowVersion.patch) {
-        return 'minor'
-      }
-      return 'patch'
-    }
-  }
-
-  // add the `pre` prefix if we are going to a prerelease version
-  const prefix = highHasPre ? 'pre' : ''
-
-  if (v1.major !== v2.major) {
-    return prefix + 'major'
-  }
-
-  if (v1.minor !== v2.minor) {
-    return prefix + 'minor'
-  }
-
-  if (v1.patch !== v2.patch) {
-    return prefix + 'patch'
-  }
-
-  // high and low are preleases
-  return 'prerelease'
-}
-
-module.exports = diff
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/eq.js":
-/*!*********************************************!*\
-  !*** ./node_modules/semver/functions/eq.js ***!
-  \*********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const eq = (a, b, loose) => compare(a, b, loose) === 0
-module.exports = eq
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/gt.js":
-/*!*********************************************!*\
-  !*** ./node_modules/semver/functions/gt.js ***!
-  \*********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const gt = (a, b, loose) => compare(a, b, loose) > 0
-module.exports = gt
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/gte.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/functions/gte.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const gte = (a, b, loose) => compare(a, b, loose) >= 0
-module.exports = gte
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/inc.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/functions/inc.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-
-const inc = (version, release, options, identifier, identifierBase) => {
-  if (typeof (options) === 'string') {
-    identifierBase = identifier
-    identifier = options
-    options = undefined
-  }
-
-  try {
-    return new SemVer(
-      version instanceof SemVer ? version.version : version,
-      options
-    ).inc(release, identifier, identifierBase).version
-  } catch (er) {
-    return null
-  }
-}
-module.exports = inc
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/lt.js":
-/*!*********************************************!*\
-  !*** ./node_modules/semver/functions/lt.js ***!
-  \*********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const lt = (a, b, loose) => compare(a, b, loose) < 0
-module.exports = lt
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/lte.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/functions/lte.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const lte = (a, b, loose) => compare(a, b, loose) <= 0
-module.exports = lte
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/major.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/major.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const major = (a, loose) => new SemVer(a, loose).major
-module.exports = major
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/minor.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/minor.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const minor = (a, loose) => new SemVer(a, loose).minor
-module.exports = minor
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/neq.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/functions/neq.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const neq = (a, b, loose) => compare(a, b, loose) !== 0
-module.exports = neq
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/parse.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/parse.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const parse = (version, options, throwErrors = false) => {
-  if (version instanceof SemVer) {
-    return version
-  }
-  try {
-    return new SemVer(version, options)
-  } catch (er) {
-    if (!throwErrors) {
-      return null
-    }
-    throw er
-  }
-}
-
-module.exports = parse
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/patch.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/patch.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const patch = (a, loose) => new SemVer(a, loose).patch
-module.exports = patch
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/prerelease.js":
-/*!*****************************************************!*\
-  !*** ./node_modules/semver/functions/prerelease.js ***!
-  \*****************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const parse = __webpack_require__(/*! ./parse */ "./node_modules/semver/functions/parse.js")
-const prerelease = (version, options) => {
-  const parsed = parse(version, options)
-  return (parsed && parsed.prerelease.length) ? parsed.prerelease : null
-}
-module.exports = prerelease
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/rcompare.js":
-/*!***************************************************!*\
-  !*** ./node_modules/semver/functions/rcompare.js ***!
-  \***************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compare = __webpack_require__(/*! ./compare */ "./node_modules/semver/functions/compare.js")
-const rcompare = (a, b, loose) => compare(b, a, loose)
-module.exports = rcompare
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/rsort.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/rsort.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compareBuild = __webpack_require__(/*! ./compare-build */ "./node_modules/semver/functions/compare-build.js")
-const rsort = (list, loose) => list.sort((a, b) => compareBuild(b, a, loose))
-module.exports = rsort
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/satisfies.js":
-/*!****************************************************!*\
-  !*** ./node_modules/semver/functions/satisfies.js ***!
-  \****************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const satisfies = (version, range, options) => {
-  try {
-    range = new Range(range, options)
-  } catch (er) {
-    return false
-  }
-  return range.test(version)
-}
-module.exports = satisfies
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/sort.js":
-/*!***********************************************!*\
-  !*** ./node_modules/semver/functions/sort.js ***!
-  \***********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const compareBuild = __webpack_require__(/*! ./compare-build */ "./node_modules/semver/functions/compare-build.js")
-const sort = (list, loose) => list.sort((a, b) => compareBuild(a, b, loose))
-module.exports = sort
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/functions/valid.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/functions/valid.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const parse = __webpack_require__(/*! ./parse */ "./node_modules/semver/functions/parse.js")
-const valid = (version, options) => {
-  const v = parse(version, options)
-  return v ? v.version : null
-}
-module.exports = valid
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/index.js":
-/*!**************************************!*\
-  !*** ./node_modules/semver/index.js ***!
-  \**************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-// just pre-load all the stuff that index.js lazily exports
-const internalRe = __webpack_require__(/*! ./internal/re */ "./node_modules/semver/internal/re.js")
-const constants = __webpack_require__(/*! ./internal/constants */ "./node_modules/semver/internal/constants.js")
-const SemVer = __webpack_require__(/*! ./classes/semver */ "./node_modules/semver/classes/semver.js")
-const identifiers = __webpack_require__(/*! ./internal/identifiers */ "./node_modules/semver/internal/identifiers.js")
-const parse = __webpack_require__(/*! ./functions/parse */ "./node_modules/semver/functions/parse.js")
-const valid = __webpack_require__(/*! ./functions/valid */ "./node_modules/semver/functions/valid.js")
-const clean = __webpack_require__(/*! ./functions/clean */ "./node_modules/semver/functions/clean.js")
-const inc = __webpack_require__(/*! ./functions/inc */ "./node_modules/semver/functions/inc.js")
-const diff = __webpack_require__(/*! ./functions/diff */ "./node_modules/semver/functions/diff.js")
-const major = __webpack_require__(/*! ./functions/major */ "./node_modules/semver/functions/major.js")
-const minor = __webpack_require__(/*! ./functions/minor */ "./node_modules/semver/functions/minor.js")
-const patch = __webpack_require__(/*! ./functions/patch */ "./node_modules/semver/functions/patch.js")
-const prerelease = __webpack_require__(/*! ./functions/prerelease */ "./node_modules/semver/functions/prerelease.js")
-const compare = __webpack_require__(/*! ./functions/compare */ "./node_modules/semver/functions/compare.js")
-const rcompare = __webpack_require__(/*! ./functions/rcompare */ "./node_modules/semver/functions/rcompare.js")
-const compareLoose = __webpack_require__(/*! ./functions/compare-loose */ "./node_modules/semver/functions/compare-loose.js")
-const compareBuild = __webpack_require__(/*! ./functions/compare-build */ "./node_modules/semver/functions/compare-build.js")
-const sort = __webpack_require__(/*! ./functions/sort */ "./node_modules/semver/functions/sort.js")
-const rsort = __webpack_require__(/*! ./functions/rsort */ "./node_modules/semver/functions/rsort.js")
-const gt = __webpack_require__(/*! ./functions/gt */ "./node_modules/semver/functions/gt.js")
-const lt = __webpack_require__(/*! ./functions/lt */ "./node_modules/semver/functions/lt.js")
-const eq = __webpack_require__(/*! ./functions/eq */ "./node_modules/semver/functions/eq.js")
-const neq = __webpack_require__(/*! ./functions/neq */ "./node_modules/semver/functions/neq.js")
-const gte = __webpack_require__(/*! ./functions/gte */ "./node_modules/semver/functions/gte.js")
-const lte = __webpack_require__(/*! ./functions/lte */ "./node_modules/semver/functions/lte.js")
-const cmp = __webpack_require__(/*! ./functions/cmp */ "./node_modules/semver/functions/cmp.js")
-const coerce = __webpack_require__(/*! ./functions/coerce */ "./node_modules/semver/functions/coerce.js")
-const Comparator = __webpack_require__(/*! ./classes/comparator */ "./node_modules/semver/classes/comparator.js")
-const Range = __webpack_require__(/*! ./classes/range */ "./node_modules/semver/classes/range.js")
-const satisfies = __webpack_require__(/*! ./functions/satisfies */ "./node_modules/semver/functions/satisfies.js")
-const toComparators = __webpack_require__(/*! ./ranges/to-comparators */ "./node_modules/semver/ranges/to-comparators.js")
-const maxSatisfying = __webpack_require__(/*! ./ranges/max-satisfying */ "./node_modules/semver/ranges/max-satisfying.js")
-const minSatisfying = __webpack_require__(/*! ./ranges/min-satisfying */ "./node_modules/semver/ranges/min-satisfying.js")
-const minVersion = __webpack_require__(/*! ./ranges/min-version */ "./node_modules/semver/ranges/min-version.js")
-const validRange = __webpack_require__(/*! ./ranges/valid */ "./node_modules/semver/ranges/valid.js")
-const outside = __webpack_require__(/*! ./ranges/outside */ "./node_modules/semver/ranges/outside.js")
-const gtr = __webpack_require__(/*! ./ranges/gtr */ "./node_modules/semver/ranges/gtr.js")
-const ltr = __webpack_require__(/*! ./ranges/ltr */ "./node_modules/semver/ranges/ltr.js")
-const intersects = __webpack_require__(/*! ./ranges/intersects */ "./node_modules/semver/ranges/intersects.js")
-const simplifyRange = __webpack_require__(/*! ./ranges/simplify */ "./node_modules/semver/ranges/simplify.js")
-const subset = __webpack_require__(/*! ./ranges/subset */ "./node_modules/semver/ranges/subset.js")
-module.exports = {
-  parse,
-  valid,
-  clean,
-  inc,
-  diff,
-  major,
-  minor,
-  patch,
-  prerelease,
-  compare,
-  rcompare,
-  compareLoose,
-  compareBuild,
-  sort,
-  rsort,
-  gt,
-  lt,
-  eq,
-  neq,
-  gte,
-  lte,
-  cmp,
-  coerce,
-  Comparator,
-  Range,
-  satisfies,
-  toComparators,
-  maxSatisfying,
-  minSatisfying,
-  minVersion,
-  validRange,
-  outside,
-  gtr,
-  ltr,
-  intersects,
-  simplifyRange,
-  subset,
-  SemVer,
-  re: internalRe.re,
-  src: internalRe.src,
-  tokens: internalRe.t,
-  SEMVER_SPEC_VERSION: constants.SEMVER_SPEC_VERSION,
-  RELEASE_TYPES: constants.RELEASE_TYPES,
-  compareIdentifiers: identifiers.compareIdentifiers,
-  rcompareIdentifiers: identifiers.rcompareIdentifiers,
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/constants.js":
-/*!***************************************************!*\
-  !*** ./node_modules/semver/internal/constants.js ***!
-  \***************************************************/
-/***/ ((module) => {
-
-"use strict";
-
-
-// Note: this is the semver.org version of the spec that it implements
-// Not necessarily the package version of this code.
-const SEMVER_SPEC_VERSION = '2.0.0'
-
-const MAX_LENGTH = 256
-const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
-/* istanbul ignore next */ 9007199254740991
-
-// Max safe segment length for coercion.
-const MAX_SAFE_COMPONENT_LENGTH = 16
-
-// Max safe length for a build identifier. The max length minus 6 characters for
-// the shortest version with a build 0.0.0+BUILD.
-const MAX_SAFE_BUILD_LENGTH = MAX_LENGTH - 6
-
-const RELEASE_TYPES = [
-  'major',
-  'premajor',
-  'minor',
-  'preminor',
-  'patch',
-  'prepatch',
-  'prerelease',
-]
-
-module.exports = {
-  MAX_LENGTH,
-  MAX_SAFE_COMPONENT_LENGTH,
-  MAX_SAFE_BUILD_LENGTH,
-  MAX_SAFE_INTEGER,
-  RELEASE_TYPES,
-  SEMVER_SPEC_VERSION,
-  FLAG_INCLUDE_PRERELEASE: 0b001,
-  FLAG_LOOSE: 0b010,
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/debug.js":
-/*!***********************************************!*\
-  !*** ./node_modules/semver/internal/debug.js ***!
-  \***********************************************/
-/***/ ((module) => {
-
-"use strict";
-
-
-const debug = (
-  typeof process === 'object' &&
-  process.env &&
-  process.env.NODE_DEBUG &&
-  /\bsemver\b/i.test(process.env.NODE_DEBUG)
-) ? (...args) => console.error('SEMVER', ...args)
-  : () => {}
-
-module.exports = debug
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/identifiers.js":
-/*!*****************************************************!*\
-  !*** ./node_modules/semver/internal/identifiers.js ***!
-  \*****************************************************/
-/***/ ((module) => {
-
-"use strict";
-
-
-const numeric = /^[0-9]+$/
-const compareIdentifiers = (a, b) => {
-  const anum = numeric.test(a)
-  const bnum = numeric.test(b)
-
-  if (anum && bnum) {
-    a = +a
-    b = +b
-  }
-
-  return a === b ? 0
-    : (anum && !bnum) ? -1
-    : (bnum && !anum) ? 1
-    : a < b ? -1
-    : 1
-}
-
-const rcompareIdentifiers = (a, b) => compareIdentifiers(b, a)
-
-module.exports = {
-  compareIdentifiers,
-  rcompareIdentifiers,
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/lrucache.js":
-/*!**************************************************!*\
-  !*** ./node_modules/semver/internal/lrucache.js ***!
-  \**************************************************/
-/***/ ((module) => {
-
-"use strict";
-
-
-class LRUCache {
-  constructor () {
-    this.max = 1000
-    this.map = new Map()
-  }
-
-  get (key) {
-    const value = this.map.get(key)
-    if (value === undefined) {
-      return undefined
-    } else {
-      // Remove the key from the map and add it to the end
-      this.map.delete(key)
-      this.map.set(key, value)
-      return value
-    }
-  }
-
-  delete (key) {
-    return this.map.delete(key)
-  }
-
-  set (key, value) {
-    const deleted = this.delete(key)
-
-    if (!deleted && value !== undefined) {
-      // If cache is full, delete the least recently used item
-      if (this.map.size >= this.max) {
-        const firstKey = this.map.keys().next().value
-        this.delete(firstKey)
-      }
-
-      this.map.set(key, value)
-    }
-
-    return this
-  }
-}
-
-module.exports = LRUCache
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/parse-options.js":
-/*!*******************************************************!*\
-  !*** ./node_modules/semver/internal/parse-options.js ***!
-  \*******************************************************/
-/***/ ((module) => {
-
-"use strict";
-
-
-// parse out just the options we care about
-const looseOption = Object.freeze({ loose: true })
-const emptyOpts = Object.freeze({ })
-const parseOptions = options => {
-  if (!options) {
-    return emptyOpts
-  }
-
-  if (typeof options !== 'object') {
-    return looseOption
-  }
-
-  return options
-}
-module.exports = parseOptions
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/internal/re.js":
-/*!********************************************!*\
-  !*** ./node_modules/semver/internal/re.js ***!
-  \********************************************/
-/***/ ((module, exports, __webpack_require__) => {
-
-"use strict";
-
-
-const {
-  MAX_SAFE_COMPONENT_LENGTH,
-  MAX_SAFE_BUILD_LENGTH,
-  MAX_LENGTH,
-} = __webpack_require__(/*! ./constants */ "./node_modules/semver/internal/constants.js")
-const debug = __webpack_require__(/*! ./debug */ "./node_modules/semver/internal/debug.js")
-exports = module.exports = {}
-
-// The actual regexps go on exports.re
-const re = exports.re = []
-const safeRe = exports.safeRe = []
-const src = exports.src = []
-const safeSrc = exports.safeSrc = []
-const t = exports.t = {}
-let R = 0
-
-const LETTERDASHNUMBER = '[a-zA-Z0-9-]'
-
-// Replace some greedy regex tokens to prevent regex dos issues. These regex are
-// used internally via the safeRe object since all inputs in this library get
-// normalized first to trim and collapse all extra whitespace. The original
-// regexes are exported for userland consumption and lower level usage. A
-// future breaking change could export the safer regex only with a note that
-// all input should have extra whitespace removed.
-const safeRegexReplacements = [
-  ['\\s', 1],
-  ['\\d', MAX_LENGTH],
-  [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH],
-]
-
-const makeSafeRegex = (value) => {
-  for (const [token, max] of safeRegexReplacements) {
-    value = value
-      .split(`${token}*`).join(`${token}{0,${max}}`)
-      .split(`${token}+`).join(`${token}{1,${max}}`)
-  }
-  return value
-}
-
-const createToken = (name, value, isGlobal) => {
-  const safe = makeSafeRegex(value)
-  const index = R++
-  debug(name, index, value)
-  t[name] = index
-  src[index] = value
-  safeSrc[index] = safe
-  re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
-  safeRe[index] = new RegExp(safe, isGlobal ? 'g' : undefined)
-}
-
-// The following Regular Expressions can be used for tokenizing,
-// validating, and parsing SemVer version strings.
-
-// ## Numeric Identifier
-// A single `0`, or a non-zero digit followed by zero or more digits.
-
-createToken('NUMERICIDENTIFIER', '0|[1-9]\\d*')
-createToken('NUMERICIDENTIFIERLOOSE', '\\d+')
-
-// ## Non-numeric Identifier
-// Zero or more digits, followed by a letter or hyphen, and then zero or
-// more letters, digits, or hyphens.
-
-createToken('NONNUMERICIDENTIFIER', `\\d*[a-zA-Z-]${LETTERDASHNUMBER}*`)
-
-// ## Main Version
-// Three dot-separated numeric identifiers.
-
-createToken('MAINVERSION', `(${src[t.NUMERICIDENTIFIER]})\\.` +
-                   `(${src[t.NUMERICIDENTIFIER]})\\.` +
-                   `(${src[t.NUMERICIDENTIFIER]})`)
-
-createToken('MAINVERSIONLOOSE', `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
-                        `(${src[t.NUMERICIDENTIFIERLOOSE]})\\.` +
-                        `(${src[t.NUMERICIDENTIFIERLOOSE]})`)
-
-// ## Pre-release Version Identifier
-// A numeric identifier, or a non-numeric identifier.
-// Non-numberic identifiers include numberic identifiers but can be longer.
-// Therefore non-numberic identifiers must go first.
-
-createToken('PRERELEASEIDENTIFIER', `(?:${src[t.NONNUMERICIDENTIFIER]
-}|${src[t.NUMERICIDENTIFIER]})`)
-
-createToken('PRERELEASEIDENTIFIERLOOSE', `(?:${src[t.NONNUMERICIDENTIFIER]
-}|${src[t.NUMERICIDENTIFIERLOOSE]})`)
-
-// ## Pre-release Version
-// Hyphen, followed by one or more dot-separated pre-release version
-// identifiers.
-
-createToken('PRERELEASE', `(?:-(${src[t.PRERELEASEIDENTIFIER]
-}(?:\\.${src[t.PRERELEASEIDENTIFIER]})*))`)
-
-createToken('PRERELEASELOOSE', `(?:-?(${src[t.PRERELEASEIDENTIFIERLOOSE]
-}(?:\\.${src[t.PRERELEASEIDENTIFIERLOOSE]})*))`)
-
-// ## Build Metadata Identifier
-// Any combination of digits, letters, or hyphens.
-
-createToken('BUILDIDENTIFIER', `${LETTERDASHNUMBER}+`)
-
-// ## Build Metadata
-// Plus sign, followed by one or more period-separated build metadata
-// identifiers.
-
-createToken('BUILD', `(?:\\+(${src[t.BUILDIDENTIFIER]
-}(?:\\.${src[t.BUILDIDENTIFIER]})*))`)
-
-// ## Full Version String
-// A main version, followed optionally by a pre-release version and
-// build metadata.
-
-// Note that the only major, minor, patch, and pre-release sections of
-// the version string are capturing groups.  The build metadata is not a
-// capturing group, because it should not ever be used in version
-// comparison.
-
-createToken('FULLPLAIN', `v?${src[t.MAINVERSION]
-}${src[t.PRERELEASE]}?${
-  src[t.BUILD]}?`)
-
-createToken('FULL', `^${src[t.FULLPLAIN]}$`)
-
-// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
-// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
-// common in the npm registry.
-createToken('LOOSEPLAIN', `[v=\\s]*${src[t.MAINVERSIONLOOSE]
-}${src[t.PRERELEASELOOSE]}?${
-  src[t.BUILD]}?`)
-
-createToken('LOOSE', `^${src[t.LOOSEPLAIN]}$`)
-
-createToken('GTLT', '((?:<|>)?=?)')
-
-// Something like "2.*" or "1.2.x".
-// Note that "x.x" is a valid xRange identifer, meaning "any version"
-// Only the first item is strictly required.
-createToken('XRANGEIDENTIFIERLOOSE', `${src[t.NUMERICIDENTIFIERLOOSE]}|x|X|\\*`)
-createToken('XRANGEIDENTIFIER', `${src[t.NUMERICIDENTIFIER]}|x|X|\\*`)
-
-createToken('XRANGEPLAIN', `[v=\\s]*(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:\\.(${src[t.XRANGEIDENTIFIER]})` +
-                   `(?:${src[t.PRERELEASE]})?${
-                     src[t.BUILD]}?` +
-                   `)?)?`)
-
-createToken('XRANGEPLAINLOOSE', `[v=\\s]*(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:\\.(${src[t.XRANGEIDENTIFIERLOOSE]})` +
-                        `(?:${src[t.PRERELEASELOOSE]})?${
-                          src[t.BUILD]}?` +
-                        `)?)?`)
-
-createToken('XRANGE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAIN]}$`)
-createToken('XRANGELOOSE', `^${src[t.GTLT]}\\s*${src[t.XRANGEPLAINLOOSE]}$`)
-
-// Coercion.
-// Extract anything that could conceivably be a part of a valid semver
-createToken('COERCEPLAIN', `${'(^|[^\\d])' +
-              '(\\d{1,'}${MAX_SAFE_COMPONENT_LENGTH}})` +
-              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?` +
-              `(?:\\.(\\d{1,${MAX_SAFE_COMPONENT_LENGTH}}))?`)
-createToken('COERCE', `${src[t.COERCEPLAIN]}(?:$|[^\\d])`)
-createToken('COERCEFULL', src[t.COERCEPLAIN] +
-              `(?:${src[t.PRERELEASE]})?` +
-              `(?:${src[t.BUILD]})?` +
-              `(?:$|[^\\d])`)
-createToken('COERCERTL', src[t.COERCE], true)
-createToken('COERCERTLFULL', src[t.COERCEFULL], true)
-
-// Tilde ranges.
-// Meaning is "reasonably at or greater than"
-createToken('LONETILDE', '(?:~>?)')
-
-createToken('TILDETRIM', `(\\s*)${src[t.LONETILDE]}\\s+`, true)
-exports.tildeTrimReplace = '$1~'
-
-createToken('TILDE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAIN]}$`)
-createToken('TILDELOOSE', `^${src[t.LONETILDE]}${src[t.XRANGEPLAINLOOSE]}$`)
-
-// Caret ranges.
-// Meaning is "at least and backwards compatible with"
-createToken('LONECARET', '(?:\\^)')
-
-createToken('CARETTRIM', `(\\s*)${src[t.LONECARET]}\\s+`, true)
-exports.caretTrimReplace = '$1^'
-
-createToken('CARET', `^${src[t.LONECARET]}${src[t.XRANGEPLAIN]}$`)
-createToken('CARETLOOSE', `^${src[t.LONECARET]}${src[t.XRANGEPLAINLOOSE]}$`)
-
-// A simple gt/lt/eq thing, or just "" to indicate "any version"
-createToken('COMPARATORLOOSE', `^${src[t.GTLT]}\\s*(${src[t.LOOSEPLAIN]})$|^$`)
-createToken('COMPARATOR', `^${src[t.GTLT]}\\s*(${src[t.FULLPLAIN]})$|^$`)
-
-// An expression to strip any whitespace between the gtlt and the thing
-// it modifies, so that `> 1.2.3` ==> `>1.2.3`
-createToken('COMPARATORTRIM', `(\\s*)${src[t.GTLT]
-}\\s*(${src[t.LOOSEPLAIN]}|${src[t.XRANGEPLAIN]})`, true)
-exports.comparatorTrimReplace = '$1$2$3'
-
-// Something like `1.2.3 - 1.2.4`
-// Note that these all use the loose form, because they'll be
-// checked against either the strict or loose comparator form
-// later.
-createToken('HYPHENRANGE', `^\\s*(${src[t.XRANGEPLAIN]})` +
-                   `\\s+-\\s+` +
-                   `(${src[t.XRANGEPLAIN]})` +
-                   `\\s*$`)
-
-createToken('HYPHENRANGELOOSE', `^\\s*(${src[t.XRANGEPLAINLOOSE]})` +
-                        `\\s+-\\s+` +
-                        `(${src[t.XRANGEPLAINLOOSE]})` +
-                        `\\s*$`)
-
-// Star ranges basically just allow anything at all.
-createToken('STAR', '(<|>)?=?\\s*\\*')
-// >=0.0.0 is like a star
-createToken('GTE0', '^\\s*>=\\s*0\\.0\\.0\\s*$')
-createToken('GTE0PRE', '^\\s*>=\\s*0\\.0\\.0-0\\s*$')
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/gtr.js":
-/*!*******************************************!*\
-  !*** ./node_modules/semver/ranges/gtr.js ***!
-  \*******************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-// Determine if version is greater than all the versions possible in the range.
-const outside = __webpack_require__(/*! ./outside */ "./node_modules/semver/ranges/outside.js")
-const gtr = (version, range, options) => outside(version, range, '>', options)
-module.exports = gtr
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/intersects.js":
-/*!**************************************************!*\
-  !*** ./node_modules/semver/ranges/intersects.js ***!
-  \**************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const intersects = (r1, r2, options) => {
-  r1 = new Range(r1, options)
-  r2 = new Range(r2, options)
-  return r1.intersects(r2, options)
-}
-module.exports = intersects
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/ltr.js":
-/*!*******************************************!*\
-  !*** ./node_modules/semver/ranges/ltr.js ***!
-  \*******************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const outside = __webpack_require__(/*! ./outside */ "./node_modules/semver/ranges/outside.js")
-// Determine if version is less than all the versions possible in the range
-const ltr = (version, range, options) => outside(version, range, '<', options)
-module.exports = ltr
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/max-satisfying.js":
-/*!******************************************************!*\
-  !*** ./node_modules/semver/ranges/max-satisfying.js ***!
-  \******************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-
-const maxSatisfying = (versions, range, options) => {
-  let max = null
-  let maxSV = null
-  let rangeObj = null
-  try {
-    rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach((v) => {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!max || maxSV.compare(v) === -1) {
-        // compare(max, v, true)
-        max = v
-        maxSV = new SemVer(max, options)
-      }
-    }
-  })
-  return max
-}
-module.exports = maxSatisfying
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/min-satisfying.js":
-/*!******************************************************!*\
-  !*** ./node_modules/semver/ranges/min-satisfying.js ***!
-  \******************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const minSatisfying = (versions, range, options) => {
-  let min = null
-  let minSV = null
-  let rangeObj = null
-  try {
-    rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach((v) => {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!min || minSV.compare(v) === 1) {
-        // compare(min, v, true)
-        min = v
-        minSV = new SemVer(min, options)
-      }
-    }
-  })
-  return min
-}
-module.exports = minSatisfying
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/min-version.js":
-/*!***************************************************!*\
-  !*** ./node_modules/semver/ranges/min-version.js ***!
-  \***************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const gt = __webpack_require__(/*! ../functions/gt */ "./node_modules/semver/functions/gt.js")
-
-const minVersion = (range, loose) => {
-  range = new Range(range, loose)
-
-  let minver = new SemVer('0.0.0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = new SemVer('0.0.0-0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = null
-  for (let i = 0; i < range.set.length; ++i) {
-    const comparators = range.set[i]
-
-    let setMin = null
-    comparators.forEach((comparator) => {
-      // Clone to avoid manipulating the comparator's semver object.
-      const compver = new SemVer(comparator.semver.version)
-      switch (comparator.operator) {
-        case '>':
-          if (compver.prerelease.length === 0) {
-            compver.patch++
-          } else {
-            compver.prerelease.push(0)
-          }
-          compver.raw = compver.format()
-          /* fallthrough */
-        case '':
-        case '>=':
-          if (!setMin || gt(compver, setMin)) {
-            setMin = compver
-          }
-          break
-        case '<':
-        case '<=':
-          /* Ignore maximum versions */
-          break
-        /* istanbul ignore next */
-        default:
-          throw new Error(`Unexpected operation: ${comparator.operator}`)
-      }
-    })
-    if (setMin && (!minver || gt(minver, setMin))) {
-      minver = setMin
-    }
-  }
-
-  if (minver && range.test(minver)) {
-    return minver
-  }
-
-  return null
-}
-module.exports = minVersion
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/outside.js":
-/*!***********************************************!*\
-  !*** ./node_modules/semver/ranges/outside.js ***!
-  \***********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const SemVer = __webpack_require__(/*! ../classes/semver */ "./node_modules/semver/classes/semver.js")
-const Comparator = __webpack_require__(/*! ../classes/comparator */ "./node_modules/semver/classes/comparator.js")
-const { ANY } = Comparator
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const satisfies = __webpack_require__(/*! ../functions/satisfies */ "./node_modules/semver/functions/satisfies.js")
-const gt = __webpack_require__(/*! ../functions/gt */ "./node_modules/semver/functions/gt.js")
-const lt = __webpack_require__(/*! ../functions/lt */ "./node_modules/semver/functions/lt.js")
-const lte = __webpack_require__(/*! ../functions/lte */ "./node_modules/semver/functions/lte.js")
-const gte = __webpack_require__(/*! ../functions/gte */ "./node_modules/semver/functions/gte.js")
-
-const outside = (version, range, hilo, options) => {
-  version = new SemVer(version, options)
-  range = new Range(range, options)
-
-  let gtfn, ltefn, ltfn, comp, ecomp
-  switch (hilo) {
-    case '>':
-      gtfn = gt
-      ltefn = lte
-      ltfn = lt
-      comp = '>'
-      ecomp = '>='
-      break
-    case '<':
-      gtfn = lt
-      ltefn = gte
-      ltfn = gt
-      comp = '<'
-      ecomp = '<='
-      break
-    default:
-      throw new TypeError('Must provide a hilo val of "<" or ">"')
-  }
-
-  // If it satisfies the range it is not outside
-  if (satisfies(version, range, options)) {
-    return false
-  }
-
-  // From now on, variable terms are as if we're in "gtr" mode.
-  // but note that everything is flipped for the "ltr" function.
-
-  for (let i = 0; i < range.set.length; ++i) {
-    const comparators = range.set[i]
-
-    let high = null
-    let low = null
-
-    comparators.forEach((comparator) => {
-      if (comparator.semver === ANY) {
-        comparator = new Comparator('>=0.0.0')
-      }
-      high = high || comparator
-      low = low || comparator
-      if (gtfn(comparator.semver, high.semver, options)) {
-        high = comparator
-      } else if (ltfn(comparator.semver, low.semver, options)) {
-        low = comparator
-      }
-    })
-
-    // If the edge version comparator has a operator then our version
-    // isn't outside it
-    if (high.operator === comp || high.operator === ecomp) {
-      return false
-    }
-
-    // If the lowest version comparator has an operator and our version
-    // is less than it then it isn't higher than the range
-    if ((!low.operator || low.operator === comp) &&
-        ltefn(version, low.semver)) {
-      return false
-    } else if (low.operator === ecomp && ltfn(version, low.semver)) {
-      return false
-    }
-  }
-  return true
-}
-
-module.exports = outside
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/simplify.js":
-/*!************************************************!*\
-  !*** ./node_modules/semver/ranges/simplify.js ***!
-  \************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-// given a set of versions and a range, create a "simplified" range
-// that includes the same versions that the original range does
-// If the original range is shorter than the simplified one, return that.
-const satisfies = __webpack_require__(/*! ../functions/satisfies.js */ "./node_modules/semver/functions/satisfies.js")
-const compare = __webpack_require__(/*! ../functions/compare.js */ "./node_modules/semver/functions/compare.js")
-module.exports = (versions, range, options) => {
-  const set = []
-  let first = null
-  let prev = null
-  const v = versions.sort((a, b) => compare(a, b, options))
-  for (const version of v) {
-    const included = satisfies(version, range, options)
-    if (included) {
-      prev = version
-      if (!first) {
-        first = version
-      }
-    } else {
-      if (prev) {
-        set.push([first, prev])
-      }
-      prev = null
-      first = null
-    }
-  }
-  if (first) {
-    set.push([first, null])
-  }
-
-  const ranges = []
-  for (const [min, max] of set) {
-    if (min === max) {
-      ranges.push(min)
-    } else if (!max && min === v[0]) {
-      ranges.push('*')
-    } else if (!max) {
-      ranges.push(`>=${min}`)
-    } else if (min === v[0]) {
-      ranges.push(`<=${max}`)
-    } else {
-      ranges.push(`${min} - ${max}`)
-    }
-  }
-  const simplified = ranges.join(' || ')
-  const original = typeof range.raw === 'string' ? range.raw : String(range)
-  return simplified.length < original.length ? simplified : range
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/subset.js":
-/*!**********************************************!*\
-  !*** ./node_modules/semver/ranges/subset.js ***!
-  \**********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const Range = __webpack_require__(/*! ../classes/range.js */ "./node_modules/semver/classes/range.js")
-const Comparator = __webpack_require__(/*! ../classes/comparator.js */ "./node_modules/semver/classes/comparator.js")
-const { ANY } = Comparator
-const satisfies = __webpack_require__(/*! ../functions/satisfies.js */ "./node_modules/semver/functions/satisfies.js")
-const compare = __webpack_require__(/*! ../functions/compare.js */ "./node_modules/semver/functions/compare.js")
-
-// Complex range `r1 || r2 || ...` is a subset of `R1 || R2 || ...` iff:
-// - Every simple range `r1, r2, ...` is a null set, OR
-// - Every simple range `r1, r2, ...` which is not a null set is a subset of
-//   some `R1, R2, ...`
-//
-// Simple range `c1 c2 ...` is a subset of simple range `C1 C2 ...` iff:
-// - If c is only the ANY comparator
-//   - If C is only the ANY comparator, return true
-//   - Else if in prerelease mode, return false
-//   - else replace c with `[>=0.0.0]`
-// - If C is only the ANY comparator
-//   - if in prerelease mode, return true
-//   - else replace C with `[>=0.0.0]`
-// - Let EQ be the set of = comparators in c
-// - If EQ is more than one, return true (null set)
-// - Let GT be the highest > or >= comparator in c
-// - Let LT be the lowest < or <= comparator in c
-// - If GT and LT, and GT.semver > LT.semver, return true (null set)
-// - If any C is a = range, and GT or LT are set, return false
-// - If EQ
-//   - If GT, and EQ does not satisfy GT, return true (null set)
-//   - If LT, and EQ does not satisfy LT, return true (null set)
-//   - If EQ satisfies every C, return true
-//   - Else return false
-// - If GT
-//   - If GT.semver is lower than any > or >= comp in C, return false
-//   - If GT is >=, and GT.semver does not satisfy every C, return false
-//   - If GT.semver has a prerelease, and not in prerelease mode
-//     - If no C has a prerelease and the GT.semver tuple, return false
-// - If LT
-//   - If LT.semver is greater than any < or <= comp in C, return false
-//   - If LT is <=, and LT.semver does not satisfy every C, return false
-//   - If GT.semver has a prerelease, and not in prerelease mode
-//     - If no C has a prerelease and the LT.semver tuple, return false
-// - Else return true
-
-const subset = (sub, dom, options = {}) => {
-  if (sub === dom) {
-    return true
-  }
-
-  sub = new Range(sub, options)
-  dom = new Range(dom, options)
-  let sawNonNull = false
-
-  OUTER: for (const simpleSub of sub.set) {
-    for (const simpleDom of dom.set) {
-      const isSub = simpleSubset(simpleSub, simpleDom, options)
-      sawNonNull = sawNonNull || isSub !== null
-      if (isSub) {
-        continue OUTER
-      }
-    }
-    // the null set is a subset of everything, but null simple ranges in
-    // a complex range should be ignored.  so if we saw a non-null range,
-    // then we know this isn't a subset, but if EVERY simple range was null,
-    // then it is a subset.
-    if (sawNonNull) {
-      return false
-    }
-  }
-  return true
-}
-
-const minimumVersionWithPreRelease = [new Comparator('>=0.0.0-0')]
-const minimumVersion = [new Comparator('>=0.0.0')]
-
-const simpleSubset = (sub, dom, options) => {
-  if (sub === dom) {
-    return true
-  }
-
-  if (sub.length === 1 && sub[0].semver === ANY) {
-    if (dom.length === 1 && dom[0].semver === ANY) {
-      return true
-    } else if (options.includePrerelease) {
-      sub = minimumVersionWithPreRelease
-    } else {
-      sub = minimumVersion
-    }
-  }
-
-  if (dom.length === 1 && dom[0].semver === ANY) {
-    if (options.includePrerelease) {
-      return true
-    } else {
-      dom = minimumVersion
-    }
-  }
-
-  const eqSet = new Set()
-  let gt, lt
-  for (const c of sub) {
-    if (c.operator === '>' || c.operator === '>=') {
-      gt = higherGT(gt, c, options)
-    } else if (c.operator === '<' || c.operator === '<=') {
-      lt = lowerLT(lt, c, options)
-    } else {
-      eqSet.add(c.semver)
-    }
-  }
-
-  if (eqSet.size > 1) {
-    return null
-  }
-
-  let gtltComp
-  if (gt && lt) {
-    gtltComp = compare(gt.semver, lt.semver, options)
-    if (gtltComp > 0) {
-      return null
-    } else if (gtltComp === 0 && (gt.operator !== '>=' || lt.operator !== '<=')) {
-      return null
-    }
-  }
-
-  // will iterate one or zero times
-  for (const eq of eqSet) {
-    if (gt && !satisfies(eq, String(gt), options)) {
-      return null
-    }
-
-    if (lt && !satisfies(eq, String(lt), options)) {
-      return null
-    }
-
-    for (const c of dom) {
-      if (!satisfies(eq, String(c), options)) {
-        return false
-      }
-    }
-
-    return true
-  }
-
-  let higher, lower
-  let hasDomLT, hasDomGT
-  // if the subset has a prerelease, we need a comparator in the superset
-  // with the same tuple and a prerelease, or it's not a subset
-  let needDomLTPre = lt &&
-    !options.includePrerelease &&
-    lt.semver.prerelease.length ? lt.semver : false
-  let needDomGTPre = gt &&
-    !options.includePrerelease &&
-    gt.semver.prerelease.length ? gt.semver : false
-  // exception: <1.2.3-0 is the same as <1.2.3
-  if (needDomLTPre && needDomLTPre.prerelease.length === 1 &&
-      lt.operator === '<' && needDomLTPre.prerelease[0] === 0) {
-    needDomLTPre = false
-  }
-
-  for (const c of dom) {
-    hasDomGT = hasDomGT || c.operator === '>' || c.operator === '>='
-    hasDomLT = hasDomLT || c.operator === '<' || c.operator === '<='
-    if (gt) {
-      if (needDomGTPre) {
-        if (c.semver.prerelease && c.semver.prerelease.length &&
-            c.semver.major === needDomGTPre.major &&
-            c.semver.minor === needDomGTPre.minor &&
-            c.semver.patch === needDomGTPre.patch) {
-          needDomGTPre = false
-        }
-      }
-      if (c.operator === '>' || c.operator === '>=') {
-        higher = higherGT(gt, c, options)
-        if (higher === c && higher !== gt) {
-          return false
-        }
-      } else if (gt.operator === '>=' && !satisfies(gt.semver, String(c), options)) {
-        return false
-      }
-    }
-    if (lt) {
-      if (needDomLTPre) {
-        if (c.semver.prerelease && c.semver.prerelease.length &&
-            c.semver.major === needDomLTPre.major &&
-            c.semver.minor === needDomLTPre.minor &&
-            c.semver.patch === needDomLTPre.patch) {
-          needDomLTPre = false
-        }
-      }
-      if (c.operator === '<' || c.operator === '<=') {
-        lower = lowerLT(lt, c, options)
-        if (lower === c && lower !== lt) {
-          return false
-        }
-      } else if (lt.operator === '<=' && !satisfies(lt.semver, String(c), options)) {
-        return false
-      }
-    }
-    if (!c.operator && (lt || gt) && gtltComp !== 0) {
-      return false
-    }
-  }
-
-  // if there was a < or >, and nothing in the dom, then must be false
-  // UNLESS it was limited by another range in the other direction.
-  // Eg, >1.0.0 <1.0.1 is still a subset of <2.0.0
-  if (gt && hasDomLT && !lt && gtltComp !== 0) {
-    return false
-  }
-
-  if (lt && hasDomGT && !gt && gtltComp !== 0) {
-    return false
-  }
-
-  // we needed a prerelease range in a specific tuple, but didn't get one
-  // then this isn't a subset.  eg >=1.2.3-pre is not a subset of >=1.0.0,
-  // because it includes prereleases in the 1.2.3 tuple
-  if (needDomGTPre || needDomLTPre) {
-    return false
-  }
-
-  return true
-}
-
-// >=1.2.3 is lower than >1.2.3
-const higherGT = (a, b, options) => {
-  if (!a) {
-    return b
-  }
-  const comp = compare(a.semver, b.semver, options)
-  return comp > 0 ? a
-    : comp < 0 ? b
-    : b.operator === '>' && a.operator === '>=' ? b
-    : a
-}
-
-// <=1.2.3 is higher than <1.2.3
-const lowerLT = (a, b, options) => {
-  if (!a) {
-    return b
-  }
-  const comp = compare(a.semver, b.semver, options)
-  return comp < 0 ? a
-    : comp > 0 ? b
-    : b.operator === '<' && a.operator === '<=' ? b
-    : a
-}
-
-module.exports = subset
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/to-comparators.js":
-/*!******************************************************!*\
-  !*** ./node_modules/semver/ranges/to-comparators.js ***!
-  \******************************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-
-// Mostly just for testing and legacy API reasons
-const toComparators = (range, options) =>
-  new Range(range, options).set
-    .map(comp => comp.map(c => c.value).join(' ').trim().split(' '))
-
-module.exports = toComparators
-
-
-/***/ }),
-
-/***/ "./node_modules/semver/ranges/valid.js":
-/*!*********************************************!*\
-  !*** ./node_modules/semver/ranges/valid.js ***!
-  \*********************************************/
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-"use strict";
-
-
-const Range = __webpack_require__(/*! ../classes/range */ "./node_modules/semver/classes/range.js")
-const validRange = (range, options) => {
-  try {
-    // Return '*' instead of '' so that truthiness works.
-    // This will throw if it's invalid anyway
-    return new Range(range, options).range || '*'
-  } catch (er) {
-    return null
-  }
-}
-module.exports = validRange
 
 
 /***/ }),
@@ -51184,6 +52250,7 @@ const { EventEmitter } = __webpack_require__(/*! events */ "events")
 const STREAM_DESTROYED = new Error('Stream was destroyed')
 const PREMATURE_CLOSE = new Error('Premature close')
 
+const queueTick = __webpack_require__(/*! queue-tick */ "./node_modules/queue-tick/process-next-tick.js")
 const FIFO = __webpack_require__(/*! fast-fifo */ "./node_modules/fast-fifo/index.js")
 const TextDecoder = __webpack_require__(/*! text-decoder */ "./node_modules/text-decoder/index.js")
 
@@ -51414,7 +52481,7 @@ class WritableState {
   updateNextTick () {
     if ((this.stream._duplexState & WRITE_NEXT_TICK) !== 0) return
     this.stream._duplexState |= WRITE_NEXT_TICK
-    if ((this.stream._duplexState & WRITE_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & WRITE_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
   }
 }
 
@@ -51602,13 +52669,13 @@ class ReadableState {
   updateNextTickIfOpen () {
     if ((this.stream._duplexState & READ_NEXT_TICK_OR_OPENING) !== 0) return
     this.stream._duplexState |= READ_NEXT_TICK
-    if ((this.stream._duplexState & READ_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & READ_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
   }
 
   updateNextTick () {
     if ((this.stream._duplexState & READ_NEXT_TICK) !== 0) return
     this.stream._duplexState |= READ_NEXT_TICK
-    if ((this.stream._duplexState & READ_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & READ_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
   }
 }
 
@@ -52636,7 +53703,6 @@ exports.pack = function pack (cwd, opts) {
   }
 
   function onstat (err, filename, stat) {
-    if (pack.destroyed) return
     if (err) return pack.destroy(err)
     if (!filename) {
       if (opts.finalize !== false) pack.finalize()
@@ -52711,8 +53777,6 @@ function processUmask () {
 exports.extract = function extract (cwd, opts) {
   if (!cwd) cwd = '.'
   if (!opts) opts = {}
-
-  cwd = path.resolve(cwd)
 
   const xfs = opts.fs || fs
   const ignore = opts.ignore || opts.filter || noop
@@ -52810,9 +53874,6 @@ exports.extract = function extract (cwd, opts) {
     function onsymlink () {
       if (win32) return next() // skip symlinks on win for now before it can be tested
       xfs.unlink(name, function () {
-        const dst = path.resolve(path.dirname(name), header.linkname)
-        if (!inCwd(dst)) return next(new Error(name + ' is not a valid symlink'))
-
         xfs.symlink(header.linkname, name, stat)
       })
     }
@@ -52820,21 +53881,17 @@ exports.extract = function extract (cwd, opts) {
     function onlink () {
       if (win32) return next() // skip links on win for now before it can be tested
       xfs.unlink(name, function () {
-        const dst = path.join(cwd, path.join('/', header.linkname))
+        const srcpath = path.join(cwd, path.join('/', header.linkname))
 
-        xfs.link(dst, name, function (err) {
+        xfs.link(srcpath, name, function (err) {
           if (err && err.code === 'EPERM' && opts.hardlinkAsFilesFallback) {
-            stream = xfs.createReadStream(dst)
+            stream = xfs.createReadStream(srcpath)
             return onfile()
           }
 
           stat(err)
         })
       })
-    }
-
-    function inCwd (dst) {
-      return dst.startsWith(cwd)
     }
 
     function onfile () {
@@ -56557,14 +57614,6 @@ function inflateOnData(chunk) {
   this[kError].code = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
   this[kError][kStatusCode] = 1009;
   this.removeListener('data', inflateOnData);
-
-  //
-  // The choice to employ `zlib.reset()` over `zlib.close()` is dictated by the
-  // fact that in Node.js versions prior to 13.10.0, the callback for
-  // `zlib.flush()` is not called if `zlib.close()` is used. Utilizing
-  // `zlib.reset()` ensures that either the callback is invoked or an error is
-  // emitted.
-  //
   this.reset();
 }
 
@@ -56580,12 +57629,6 @@ function inflateOnError(err) {
   // closed when an error is emitted.
   //
   this[kPerMessageDeflate]._inflate = null;
-
-  if (this[kError]) {
-    this[kCallback](this[kError]);
-    return;
-  }
-
   err[kStatusCode] = 1007;
   this[kCallback](err);
 }
@@ -57870,7 +58913,7 @@ class Sender {
   /**
    * Sends a frame.
    *
-   * @param {(Buffer | String)[]} list The frame to send
+   * @param {Buffer[]} list The frame to send
    * @param {Function} [cb] Callback
    * @private
    */
@@ -57930,10 +58973,8 @@ function onError(sender, err, cb) {
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
-/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^WebSocket$" }] */
 
 
-const WebSocket = __webpack_require__(/*! ./websocket */ "./node_modules/ws/lib/websocket.js");
 const { Duplex } = __webpack_require__(/*! stream */ "stream");
 
 /**
@@ -59599,7 +60640,7 @@ function initAsClient(websocket, address, protocols, options) {
   if (parsedUrl.protocol !== 'ws:' && !isSecure && !isIpcUrl) {
     invalidUrlMessage =
       'The URL\'s protocol must be one of "ws:", "wss:", ' +
-      '"http:", "https:", or "ws+unix:"';
+      '"http:", "https", or "ws+unix:"';
   } else if (isIpcUrl && !parsedUrl.pathname) {
     invalidUrlMessage = "The URL's pathname is empty";
   } else if (parsedUrl.hash) {
@@ -60277,6 +61318,462 @@ function socketOnError() {
     this.destroy();
   }
 }
+
+
+/***/ }),
+
+/***/ "./node_modules/yallist/iterator.js":
+/*!******************************************!*\
+  !*** ./node_modules/yallist/iterator.js ***!
+  \******************************************/
+/***/ ((module) => {
+
+"use strict";
+
+module.exports = function (Yallist) {
+  Yallist.prototype[Symbol.iterator] = function* () {
+    for (let walker = this.head; walker; walker = walker.next) {
+      yield walker.value
+    }
+  }
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/yallist/yallist.js":
+/*!*****************************************!*\
+  !*** ./node_modules/yallist/yallist.js ***!
+  \*****************************************/
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+module.exports = Yallist
+
+Yallist.Node = Node
+Yallist.create = Yallist
+
+function Yallist (list) {
+  var self = this
+  if (!(self instanceof Yallist)) {
+    self = new Yallist()
+  }
+
+  self.tail = null
+  self.head = null
+  self.length = 0
+
+  if (list && typeof list.forEach === 'function') {
+    list.forEach(function (item) {
+      self.push(item)
+    })
+  } else if (arguments.length > 0) {
+    for (var i = 0, l = arguments.length; i < l; i++) {
+      self.push(arguments[i])
+    }
+  }
+
+  return self
+}
+
+Yallist.prototype.removeNode = function (node) {
+  if (node.list !== this) {
+    throw new Error('removing node which does not belong to this list')
+  }
+
+  var next = node.next
+  var prev = node.prev
+
+  if (next) {
+    next.prev = prev
+  }
+
+  if (prev) {
+    prev.next = next
+  }
+
+  if (node === this.head) {
+    this.head = next
+  }
+  if (node === this.tail) {
+    this.tail = prev
+  }
+
+  node.list.length--
+  node.next = null
+  node.prev = null
+  node.list = null
+
+  return next
+}
+
+Yallist.prototype.unshiftNode = function (node) {
+  if (node === this.head) {
+    return
+  }
+
+  if (node.list) {
+    node.list.removeNode(node)
+  }
+
+  var head = this.head
+  node.list = this
+  node.next = head
+  if (head) {
+    head.prev = node
+  }
+
+  this.head = node
+  if (!this.tail) {
+    this.tail = node
+  }
+  this.length++
+}
+
+Yallist.prototype.pushNode = function (node) {
+  if (node === this.tail) {
+    return
+  }
+
+  if (node.list) {
+    node.list.removeNode(node)
+  }
+
+  var tail = this.tail
+  node.list = this
+  node.prev = tail
+  if (tail) {
+    tail.next = node
+  }
+
+  this.tail = node
+  if (!this.head) {
+    this.head = node
+  }
+  this.length++
+}
+
+Yallist.prototype.push = function () {
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    push(this, arguments[i])
+  }
+  return this.length
+}
+
+Yallist.prototype.unshift = function () {
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    unshift(this, arguments[i])
+  }
+  return this.length
+}
+
+Yallist.prototype.pop = function () {
+  if (!this.tail) {
+    return undefined
+  }
+
+  var res = this.tail.value
+  this.tail = this.tail.prev
+  if (this.tail) {
+    this.tail.next = null
+  } else {
+    this.head = null
+  }
+  this.length--
+  return res
+}
+
+Yallist.prototype.shift = function () {
+  if (!this.head) {
+    return undefined
+  }
+
+  var res = this.head.value
+  this.head = this.head.next
+  if (this.head) {
+    this.head.prev = null
+  } else {
+    this.tail = null
+  }
+  this.length--
+  return res
+}
+
+Yallist.prototype.forEach = function (fn, thisp) {
+  thisp = thisp || this
+  for (var walker = this.head, i = 0; walker !== null; i++) {
+    fn.call(thisp, walker.value, i, this)
+    walker = walker.next
+  }
+}
+
+Yallist.prototype.forEachReverse = function (fn, thisp) {
+  thisp = thisp || this
+  for (var walker = this.tail, i = this.length - 1; walker !== null; i--) {
+    fn.call(thisp, walker.value, i, this)
+    walker = walker.prev
+  }
+}
+
+Yallist.prototype.get = function (n) {
+  for (var i = 0, walker = this.head; walker !== null && i < n; i++) {
+    // abort out of the list early if we hit a cycle
+    walker = walker.next
+  }
+  if (i === n && walker !== null) {
+    return walker.value
+  }
+}
+
+Yallist.prototype.getReverse = function (n) {
+  for (var i = 0, walker = this.tail; walker !== null && i < n; i++) {
+    // abort out of the list early if we hit a cycle
+    walker = walker.prev
+  }
+  if (i === n && walker !== null) {
+    return walker.value
+  }
+}
+
+Yallist.prototype.map = function (fn, thisp) {
+  thisp = thisp || this
+  var res = new Yallist()
+  for (var walker = this.head; walker !== null;) {
+    res.push(fn.call(thisp, walker.value, this))
+    walker = walker.next
+  }
+  return res
+}
+
+Yallist.prototype.mapReverse = function (fn, thisp) {
+  thisp = thisp || this
+  var res = new Yallist()
+  for (var walker = this.tail; walker !== null;) {
+    res.push(fn.call(thisp, walker.value, this))
+    walker = walker.prev
+  }
+  return res
+}
+
+Yallist.prototype.reduce = function (fn, initial) {
+  var acc
+  var walker = this.head
+  if (arguments.length > 1) {
+    acc = initial
+  } else if (this.head) {
+    walker = this.head.next
+    acc = this.head.value
+  } else {
+    throw new TypeError('Reduce of empty list with no initial value')
+  }
+
+  for (var i = 0; walker !== null; i++) {
+    acc = fn(acc, walker.value, i)
+    walker = walker.next
+  }
+
+  return acc
+}
+
+Yallist.prototype.reduceReverse = function (fn, initial) {
+  var acc
+  var walker = this.tail
+  if (arguments.length > 1) {
+    acc = initial
+  } else if (this.tail) {
+    walker = this.tail.prev
+    acc = this.tail.value
+  } else {
+    throw new TypeError('Reduce of empty list with no initial value')
+  }
+
+  for (var i = this.length - 1; walker !== null; i--) {
+    acc = fn(acc, walker.value, i)
+    walker = walker.prev
+  }
+
+  return acc
+}
+
+Yallist.prototype.toArray = function () {
+  var arr = new Array(this.length)
+  for (var i = 0, walker = this.head; walker !== null; i++) {
+    arr[i] = walker.value
+    walker = walker.next
+  }
+  return arr
+}
+
+Yallist.prototype.toArrayReverse = function () {
+  var arr = new Array(this.length)
+  for (var i = 0, walker = this.tail; walker !== null; i++) {
+    arr[i] = walker.value
+    walker = walker.prev
+  }
+  return arr
+}
+
+Yallist.prototype.slice = function (from, to) {
+  to = to || this.length
+  if (to < 0) {
+    to += this.length
+  }
+  from = from || 0
+  if (from < 0) {
+    from += this.length
+  }
+  var ret = new Yallist()
+  if (to < from || to < 0) {
+    return ret
+  }
+  if (from < 0) {
+    from = 0
+  }
+  if (to > this.length) {
+    to = this.length
+  }
+  for (var i = 0, walker = this.head; walker !== null && i < from; i++) {
+    walker = walker.next
+  }
+  for (; walker !== null && i < to; i++, walker = walker.next) {
+    ret.push(walker.value)
+  }
+  return ret
+}
+
+Yallist.prototype.sliceReverse = function (from, to) {
+  to = to || this.length
+  if (to < 0) {
+    to += this.length
+  }
+  from = from || 0
+  if (from < 0) {
+    from += this.length
+  }
+  var ret = new Yallist()
+  if (to < from || to < 0) {
+    return ret
+  }
+  if (from < 0) {
+    from = 0
+  }
+  if (to > this.length) {
+    to = this.length
+  }
+  for (var i = this.length, walker = this.tail; walker !== null && i > to; i--) {
+    walker = walker.prev
+  }
+  for (; walker !== null && i > from; i--, walker = walker.prev) {
+    ret.push(walker.value)
+  }
+  return ret
+}
+
+Yallist.prototype.splice = function (start, deleteCount, ...nodes) {
+  if (start > this.length) {
+    start = this.length - 1
+  }
+  if (start < 0) {
+    start = this.length + start;
+  }
+
+  for (var i = 0, walker = this.head; walker !== null && i < start; i++) {
+    walker = walker.next
+  }
+
+  var ret = []
+  for (var i = 0; walker && i < deleteCount; i++) {
+    ret.push(walker.value)
+    walker = this.removeNode(walker)
+  }
+  if (walker === null) {
+    walker = this.tail
+  }
+
+  if (walker !== this.head && walker !== this.tail) {
+    walker = walker.prev
+  }
+
+  for (var i = 0; i < nodes.length; i++) {
+    walker = insert(this, walker, nodes[i])
+  }
+  return ret;
+}
+
+Yallist.prototype.reverse = function () {
+  var head = this.head
+  var tail = this.tail
+  for (var walker = head; walker !== null; walker = walker.prev) {
+    var p = walker.prev
+    walker.prev = walker.next
+    walker.next = p
+  }
+  this.head = tail
+  this.tail = head
+  return this
+}
+
+function insert (self, node, value) {
+  var inserted = node === self.head ?
+    new Node(value, null, node, self) :
+    new Node(value, node, node.next, self)
+
+  if (inserted.next === null) {
+    self.tail = inserted
+  }
+  if (inserted.prev === null) {
+    self.head = inserted
+  }
+
+  self.length++
+
+  return inserted
+}
+
+function push (self, item) {
+  self.tail = new Node(item, self.tail, null, self)
+  if (!self.head) {
+    self.head = self.tail
+  }
+  self.length++
+}
+
+function unshift (self, item) {
+  self.head = new Node(item, null, self.head, self)
+  if (!self.tail) {
+    self.tail = self.head
+  }
+  self.length++
+}
+
+function Node (value, prev, next, list) {
+  if (!(this instanceof Node)) {
+    return new Node(value, prev, next, list)
+  }
+
+  this.list = list
+  this.value = value
+
+  if (prev) {
+    prev.next = this
+    this.prev = prev
+  } else {
+    this.prev = null
+  }
+
+  if (next) {
+    next.prev = this
+    this.next = next
+  } else {
+    this.next = null
+  }
+}
+
+try {
+  // add if support for Symbol.iterator is present
+  __webpack_require__(/*! ./iterator.js */ "./node_modules/yallist/iterator.js")(Yallist)
+} catch (er) {}
 
 
 /***/ }),
@@ -61236,10 +62733,8 @@ class CLI {
     }
     #build(yargs) {
         const latestOrPinned = this.#pinnedBrowsers ? 'pinned' : 'latest';
-        // If there are pinned browsers allow the positional arg to be optional
-        const browserArgType = this.#pinnedBrowsers ? '[browser]' : '<browser>';
         return yargs
-            .command(`install ${browserArgType}`, 'Download and install the specified browser. If successful, the command outputs the actual browser buildId that was installed and the absolute path to the browser executable (format: <browser>@<buildID> <path>).', yargs => {
+            .command('install <browser>', 'Download and install the specified browser. If successful, the command outputs the actual browser buildId that was installed and the absolute path to the browser executable (format: <browser>@<buildID> <path>).', yargs => {
             this.#defineBrowserParameter(yargs);
             this.#definePlatformParameter(yargs);
             this.#definePathParameter(yargs);
@@ -61247,9 +62742,6 @@ class CLI {
                 type: 'string',
                 desc: 'Base URL to download from',
             });
-            if (this.#pinnedBrowsers) {
-                yargs.example('$0 install', 'Install all pinned browsers');
-            }
             yargs.example('$0 install chrome', `Install the ${latestOrPinned} available build of the Chrome browser.`);
             yargs.example('$0 install chrome@latest', 'Install the latest available build for the Chrome browser.');
             yargs.example('$0 install chrome@stable', 'Install the latest available build for the Chrome browser from the stable channel.');
@@ -61277,31 +62769,36 @@ class CLI {
             }
         }, async (argv) => {
             const args = argv;
-            if (this.#pinnedBrowsers && !args.browser) {
-                // Use allSettled to avoid scenarios that
-                // a browser may fail early and leave the other
-                // installation in a faulty state
-                const result = await Promise.allSettled(Object.entries(this.#pinnedBrowsers).map(async ([browser, options]) => {
-                    if (options.skipDownload) {
-                        return;
-                    }
-                    await this.#install({
-                        ...argv,
-                        browser: {
-                            name: browser,
-                            buildId: options.buildId,
-                        },
-                    });
-                }));
-                for (const install of result) {
-                    if (install.status === 'rejected') {
-                        throw install.reason;
-                    }
+            args.platform ??= (0, detectPlatform_js_1.detectBrowserPlatform)();
+            if (!args.platform) {
+                throw new Error(`Could not resolve the current platform`);
+            }
+            if (args.browser.buildId === 'pinned') {
+                const pinnedVersion = this.#pinnedBrowsers?.[args.browser.name];
+                if (!pinnedVersion) {
+                    throw new Error(`No pinned version found for ${args.browser.name}`);
                 }
+                args.browser.buildId = pinnedVersion;
             }
-            else {
-                await this.#install(args);
-            }
+            const originalBuildId = args.browser.buildId;
+            args.browser.buildId = await (0, browser_data_js_1.resolveBuildId)(args.browser.name, args.platform, args.browser.buildId);
+            await (0, install_js_1.install)({
+                browser: args.browser.name,
+                buildId: args.browser.buildId,
+                platform: args.platform,
+                cacheDir: args.path ?? this.#cachePath,
+                downloadProgressCallback: makeProgressCallback(args.browser.name, args.browser.buildId),
+                baseUrl: args.baseUrl,
+                buildIdAlias: originalBuildId !== args.browser.buildId
+                    ? originalBuildId
+                    : undefined,
+            });
+            console.log(`${args.browser.name}@${args.browser.buildId} ${(0, launch_js_1.computeExecutablePath)({
+                browser: args.browser.name,
+                buildId: args.browser.buildId,
+                cacheDir: args.path ?? this.#cachePath,
+                platform: args.platform,
+            })}`);
         })
             .command('launch <browser>', 'Launch the specified browser', yargs => {
             this.#defineBrowserParameter(yargs);
@@ -61374,39 +62871,6 @@ class CLI {
                 ? 'pinned'
                 : 'latest';
     }
-    async #install(args) {
-        args.platform ??= (0, detectPlatform_js_1.detectBrowserPlatform)();
-        if (!args.browser) {
-            throw new Error(`No browser arg proveded`);
-        }
-        if (!args.platform) {
-            throw new Error(`Could not resolve the current platform`);
-        }
-        if (args.browser.buildId === 'pinned') {
-            const options = this.#pinnedBrowsers?.[args.browser.name];
-            if (!options || !options.buildId) {
-                throw new Error(`No pinned version found for ${args.browser.name}`);
-            }
-            args.browser.buildId = options.buildId;
-        }
-        const originalBuildId = args.browser.buildId;
-        args.browser.buildId = await (0, browser_data_js_1.resolveBuildId)(args.browser.name, args.platform, args.browser.buildId);
-        await (0, install_js_1.install)({
-            browser: args.browser.name,
-            buildId: args.browser.buildId,
-            platform: args.platform,
-            cacheDir: args.path ?? this.#cachePath,
-            downloadProgressCallback: makeProgressCallback(args.browser.name, args.browser.buildId),
-            baseUrl: args.baseUrl,
-            buildIdAlias: originalBuildId !== args.browser.buildId ? originalBuildId : undefined,
-        });
-        console.log(`${args.browser.name}@${args.browser.buildId} ${(0, launch_js_1.computeExecutablePath)({
-            browser: args.browser.name,
-            buildId: args.browser.buildId,
-            cacheDir: args.path ?? this.#cachePath,
-            platform: args.platform,
-        })}`);
-    }
 }
 exports.CLI = CLI;
 /**
@@ -61459,7 +62923,7 @@ exports.Cache = exports.InstalledBrowser = void 0;
 const fs_1 = __importDefault(__webpack_require__(/*! fs */ "fs"));
 const os_1 = __importDefault(__webpack_require__(/*! os */ "os"));
 const path_1 = __importDefault(__webpack_require__(/*! path */ "path"));
-const debug_1 = __importDefault(__webpack_require__(/*! debug */ "./node_modules/debug/src/index.js"));
+const debug_1 = __importDefault(__webpack_require__(/*! debug */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/index.js"));
 const browser_data_js_1 = __webpack_require__(/*! ./browser-data/browser-data.js */ "./node_modules/@puppeteer/browsers/lib/cjs/browser-data/browser-data.js");
 const detectPlatform_js_1 = __webpack_require__(/*! ./detectPlatform.js */ "./node_modules/@puppeteer/browsers/lib/cjs/detectPlatform.js");
 const debugCache = (0, debug_1.default)('puppeteer:browsers:cache');
@@ -61965,7 +63429,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.compareVersions = exports.resolveSystemExecutablePath = exports.resolveBuildId = exports.getLastKnownGoodReleaseForBuild = exports.getLastKnownGoodReleaseForMilestone = exports.getLastKnownGoodReleaseForChannel = exports.relativeExecutablePath = exports.resolveDownloadPath = exports.resolveDownloadUrl = void 0;
 const path_1 = __importDefault(__webpack_require__(/*! path */ "path"));
-const semver_1 = __importDefault(__webpack_require__(/*! semver */ "./node_modules/semver/index.js"));
+const semver_1 = __importDefault(__webpack_require__(/*! semver */ "./node_modules/@puppeteer/browsers/node_modules/semver/index.js"));
 const httpUtil_js_1 = __webpack_require__(/*! ../httpUtil.js */ "./node_modules/@puppeteer/browsers/lib/cjs/httpUtil.js");
 const types_js_1 = __webpack_require__(/*! ./types.js */ "./node_modules/@puppeteer/browsers/lib/cjs/browser-data/types.js");
 function folder(platform) {
@@ -62701,7 +64165,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.debug = void 0;
-const debug_1 = __importDefault(__webpack_require__(/*! debug */ "./node_modules/debug/src/index.js"));
+const debug_1 = __importDefault(__webpack_require__(/*! debug */ "./node_modules/@puppeteer/browsers/node_modules/debug/src/index.js"));
 exports.debug = debug_1.default;
 //# sourceMappingURL=debug.js.map
 
@@ -62815,9 +64279,11 @@ const child_process_1 = __webpack_require__(/*! child_process */ "child_process"
 const fs_1 = __webpack_require__(/*! fs */ "fs");
 const promises_1 = __webpack_require__(/*! fs/promises */ "fs/promises");
 const path = __importStar(__webpack_require__(/*! path */ "path"));
+const util_1 = __webpack_require__(/*! util */ "util");
 const extract_zip_1 = __importDefault(__webpack_require__(/*! extract-zip */ "./node_modules/extract-zip/index.js"));
 const tar_fs_1 = __importDefault(__webpack_require__(/*! tar-fs */ "./node_modules/tar-fs/index.js"));
 const unbzip2_stream_1 = __importDefault(__webpack_require__(/*! unbzip2-stream */ "./node_modules/unbzip2-stream/index.js"));
+const exec = (0, util_1.promisify)(child_process_1.exec);
 /**
  * @internal
  */
@@ -62864,13 +64330,8 @@ function extractTar(tarPath, folderPath) {
  * @internal
  */
 async function installDMG(dmgPath, folderPath) {
-    const { stdout } = (0, child_process_1.spawnSync)(`hdiutil`, [
-        'attach',
-        '-nobrowse',
-        '-noautoopen',
-        dmgPath,
-    ]);
-    const volumes = stdout.toString('utf8').match(/\/Volumes\/(.*)/m);
+    const { stdout } = await exec(`hdiutil attach -nobrowse -noautoopen "${dmgPath}"`);
+    const volumes = stdout.match(/\/Volumes\/(.*)/m);
     if (!volumes) {
         throw new Error(`Could not find volume path in ${stdout}`);
     }
@@ -62884,10 +64345,10 @@ async function installDMG(dmgPath, folderPath) {
             throw new Error(`Cannot find app in ${mountPath}`);
         }
         const mountedPath = path.join(mountPath, appName);
-        (0, child_process_1.spawnSync)('cp', ['-R', mountedPath, folderPath]);
+        await exec(`cp -R "${mountedPath}" "${folderPath}"`);
     }
     finally {
-        (0, child_process_1.spawnSync)('hdiutil', ['detach', mountPath, '-quiet']);
+        await exec(`hdiutil detach "${mountPath}" -quiet`);
     }
 }
 //# sourceMappingURL=fileUtil.js.map
@@ -63078,7 +64539,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.canDownload = exports.getInstalledBrowsers = exports.uninstall = exports.install = void 0;
 const assert_1 = __importDefault(__webpack_require__(/*! assert */ "assert"));
-const child_process_1 = __webpack_require__(/*! child_process */ "child_process");
 const fs_1 = __webpack_require__(/*! fs */ "fs");
 const promises_1 = __webpack_require__(/*! fs/promises */ "fs/promises");
 const os_1 = __importDefault(__webpack_require__(/*! os */ "os"));
@@ -63188,7 +64648,6 @@ async function installUrl(url, options) {
             if (!(0, fs_1.existsSync)(installedBrowser.executablePath)) {
                 throw new Error(`The browser folder (${outputPath}) exists but the executable (${installedBrowser.executablePath}) is missing`);
             }
-            await runSetup(installedBrowser);
             return installedBrowser;
         }
         debugInstall(`Downloading binary from ${url}`);
@@ -63213,36 +64672,11 @@ async function installUrl(url, options) {
             metadata.aliases[options.buildIdAlias] = options.buildId;
             installedBrowser.writeMetadata(metadata);
         }
-        await runSetup(installedBrowser);
         return installedBrowser;
     }
     finally {
         if ((0, fs_1.existsSync)(archivePath)) {
             await (0, promises_1.unlink)(archivePath);
-        }
-    }
-}
-async function runSetup(installedBrowser) {
-    // On Windows for Chrome invoke setup.exe to configure sandboxes.
-    if ((installedBrowser.platform === browser_data_js_1.BrowserPlatform.WIN32 ||
-        installedBrowser.platform === browser_data_js_1.BrowserPlatform.WIN64) &&
-        installedBrowser.browser === browser_data_js_1.Browser.CHROME &&
-        installedBrowser.platform === (0, detectPlatform_js_1.detectBrowserPlatform)()) {
-        try {
-            debugTime('permissions');
-            const browserDir = path_1.default.dirname(installedBrowser.executablePath);
-            const setupExePath = path_1.default.join(browserDir, 'setup.exe');
-            if (!(0, fs_1.existsSync)(setupExePath)) {
-                return;
-            }
-            (0, child_process_1.spawnSync)(path_1.default.join(browserDir, 'setup.exe'), [`--configure-browser-in-directory=` + browserDir], {
-                shell: true,
-            });
-            // TODO: Handle error here. Currently the setup.exe sometimes
-            // errors although it sets the permissions correctly.
-        }
-        finally {
-            debugTimeEnd('permissions');
         }
     }
 }
@@ -69431,10 +70865,7 @@ class Dialog {
     #type;
     #message;
     #defaultValue;
-    /**
-     * @internal
-     */
-    handled = false;
+    #handled = false;
     /**
      * @internal
      */
@@ -69470,8 +70901,8 @@ class Dialog {
      *
      */
     async accept(promptText) {
-        (0, assert_js_1.assert)(!this.handled, 'Cannot accept dialog which is already handled!');
-        this.handled = true;
+        (0, assert_js_1.assert)(!this.#handled, 'Cannot accept dialog which is already handled!');
+        this.#handled = true;
         await this.handle({
             accept: true,
             text: promptText,
@@ -69481,8 +70912,8 @@ class Dialog {
      * A promise which will resolve once the dialog has been dismissed
      */
     async dismiss() {
-        (0, assert_js_1.assert)(!this.handled, 'Cannot dismiss dialog which is already handled!');
-        this.handled = true;
+        (0, assert_js_1.assert)(!this.#handled, 'Cannot dismiss dialog which is already handled!');
+        this.#handled = true;
         await this.handle({
             accept: false,
         });
@@ -71938,7 +73369,7 @@ class HTTPRequest {
         await this.interception.handlers.reduce((promiseChain, interceptAction) => {
             return promiseChain.then(interceptAction);
         }, Promise.resolve());
-        this.interception.handlers = [];
+        this.interception.handlers = []; // TODO: verify this is correct top let gc run
         const { action } = this.interceptResolutionState();
         switch (action) {
             case 'abort':
@@ -73471,12 +74902,12 @@ let Page = (() => {
          */
         async waitForFrame(urlOrPredicate, options = {}) {
             const { timeout: ms = this.getDefaultTimeout(), signal } = options;
-            const predicate = (0, util_js_1.isString)(urlOrPredicate)
-                ? (frame) => {
+            if ((0, util_js_1.isString)(urlOrPredicate)) {
+                urlOrPredicate = (frame) => {
                     return urlOrPredicate === frame.url();
-                }
-                : urlOrPredicate;
-            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(predicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+                };
+            }
+            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed.');
             })))));
         }
@@ -73497,7 +74928,7 @@ let Page = (() => {
          *
          * ```ts
          * import {KnownDevices} from 'puppeteer';
-         * const iPhone = KnownDevices['iPhone 15 Pro'];
+         * const iPhone = KnownDevices['iPhone 6'];
          *
          * (async () => {
          *   const browser = await puppeteer.launch();
@@ -75281,8 +76712,9 @@ async function connectBidiOverCdp(cdp, options) {
         pptrTransport.onmessage(JSON.stringify(message));
     });
     const pptrBiDiConnection = new Connection_js_1.BidiConnection(cdp.url(), pptrTransport, cdp.delay, cdp.timeout);
-    const bidiServer = await BidiMapper.BidiServer.createAndStart(transportBiDi, cdpConnectionAdapter, cdpConnectionAdapter.browserClient(), 
-    /* selfTargetId= */ '', {
+    const bidiServer = await BidiMapper.BidiServer.createAndStart(transportBiDi, cdpConnectionAdapter, 
+    // TODO: most likely need a little bit of refactoring
+    cdpConnectionAdapter.browserClient(), '', {
         // Override Mapper's `unhandledPromptBehavior` default value of `dismiss` to
         // `ignore`, so that user can handle the prompt instead of just closing it.
         unhandledPromptBehavior: {
@@ -75478,6 +76910,7 @@ let BidiBrowser = (() => {
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         protocol = 'webDriverBiDi';
+        // TODO: Update generator to include fully module
         static subscribeModules = [
             'browsingContext',
             'network',
@@ -75500,9 +76933,6 @@ let BidiBrowser = (() => {
             const session = await Session_js_1.Session.from(opts.connection, {
                 alwaysMatch: {
                     acceptInsecureCerts: opts.ignoreHTTPSErrors,
-                    unhandledPromptBehavior: {
-                        default: "ignore" /* Bidi.Session.UserPromptHandlerType.Ignore */,
-                    },
                     webSocketUrl: true,
                 },
             });
@@ -75522,14 +76952,12 @@ let BidiBrowser = (() => {
         #defaultViewport;
         #browserContexts = new WeakMap();
         #target = new Target_js_1.BidiBrowserTarget(this);
-        #cdpConnection;
         constructor(browserCore, opts) {
             super();
             this.#process = opts.process;
             this.#closeCallback = opts.closeCallback;
             this.#browserCore = browserCore;
             this.#defaultViewport = opts.defaultViewport;
-            this.#cdpConnection = opts.cdpConnection;
         }
         #initialize() {
             // Initializing existing contexts.
@@ -75552,10 +76980,7 @@ let BidiBrowser = (() => {
             return this.#browserCore.session.capabilities.browserVersion;
         }
         get cdpSupported() {
-            return this.#cdpConnection !== undefined;
-        }
-        get cdpConnection() {
-            return this.#cdpConnection;
+            return !this.#browserName.toLocaleLowerCase().includes('firefox');
         }
         async userAgent() {
             return this.#browserCore.session.capabilities.userAgent;
@@ -75709,11 +77134,10 @@ const util_js_1 = __webpack_require__(/*! ../common/util.js */ "./node_modules/p
  */
 async function _connectToBiDiBrowser(connectionTransport, url, options) {
     const { ignoreHTTPSErrors = false, defaultViewport = util_js_1.DEFAULT_VIEWPORT } = options;
-    const { bidiConnection, cdpConnection, closeCallback } = await getBiDiConnection(connectionTransport, url, options);
+    const { bidiConnection, closeCallback } = await getBiDiConnection(connectionTransport, url, options);
     const BiDi = await Promise.resolve().then(() => __importStar(__webpack_require__(/* webpackIgnore: true */ /*! ./bidi.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/bidi/bidi.js")));
     const bidiBrowser = await BiDi.BidiBrowser.create({
         connection: bidiConnection,
-        cdpConnection,
         closeCallback,
         process: undefined,
         defaultViewport: defaultViewport,
@@ -75760,11 +77184,11 @@ async function getBiDiConnection(connectionTransport, url, options) {
     if (version.product.toLowerCase().includes('firefox')) {
         throw new Errors_js_1.UnsupportedOperation('Firefox is not supported in BiDi over CDP mode.');
     }
+    // TODO: use other options too.
     const bidiOverCdpConnection = await BiDi.connectBidiOverCdp(cdpConnection, {
         acceptInsecureCerts: ignoreHTTPSErrors,
     });
     return {
-        cdpConnection,
         bidiConnection: bidiOverCdpConnection,
         closeCallback: async () => {
             // In case of BiDi over CDP, we need to close browser via CDP.
@@ -76475,7 +77899,6 @@ class BidiDialog extends Dialog_js_1.Dialog {
     constructor(prompt) {
         super(prompt.info.type, prompt.info.message, prompt.info.defaultValue);
         this.#prompt = prompt;
-        this.handled = prompt.handled;
     }
     async handle(options) {
         await this.#prompt.handle({
@@ -77025,6 +78448,22 @@ exports.ExposeableFunction = ExposeableFunction;
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -77059,12 +78498,20 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     if (target) Object.defineProperty(target, contextIn.name, descriptor);
     done = true;
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
     if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiFrame = void 0;
+const Bidi = __importStar(__webpack_require__(/*! chromium-bidi/lib/cjs/protocol/protocol.js */ "./node_modules/chromium-bidi/lib/cjs/protocol/protocol.js"));
 const rxjs_js_1 = __webpack_require__(/*! ../../third_party/rxjs/rxjs.js */ "./node_modules/puppeteer-core/lib/cjs/third_party/rxjs/rxjs.js");
 const Frame_js_1 = __webpack_require__(/*! ../api/Frame.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/api/Frame.js");
 const Accessibility_js_1 = __webpack_require__(/*! ../cdp/Accessibility.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Accessibility.js");
@@ -77367,14 +78814,12 @@ let BidiFrame = (() => {
             ]);
         }
         async waitForNavigation(options = {}) {
-            const { timeout: ms = this.timeoutSettings.navigationTimeout(), signal } = options;
+            const { timeout: ms = this.timeoutSettings.navigationTimeout() } = options;
             const frames = this.childFrames().map(frame => {
                 return frame.#detached$();
             });
             return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.combineLatest)([
-                (0, util_js_1.fromEmitterEvent)(this.browsingContext, 'navigation')
-                    .pipe((0, rxjs_js_1.first)())
-                    .pipe((0, rxjs_js_1.switchMap)(({ navigation }) => {
+                (0, util_js_1.fromEmitterEvent)(this.browsingContext, 'navigation').pipe((0, rxjs_js_1.switchMap)(({ navigation }) => {
                     return this.#waitForLoad$(options).pipe((0, rxjs_js_1.delayWhen)(() => {
                         if (frames.length === 0) {
                             return (0, rxjs_js_1.of)(undefined);
@@ -77414,7 +78859,7 @@ let BidiFrame = (() => {
                 const lastRequest = request.lastRedirect ?? request;
                 const httpRequest = HTTPRequest_js_1.requests.get(lastRequest);
                 return httpRequest.response();
-            }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), this.#detached$().pipe((0, rxjs_js_1.map)(() => {
+            }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), this.#detached$().pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Frame detached.');
             })))));
         }
@@ -77441,11 +78886,12 @@ let BidiFrame = (() => {
             await exposedFunction[Symbol.asyncDispose]();
         }
         async createCDPSession() {
-            if (!this.page().browser().cdpSupported) {
-                throw new Errors_js_1.UnsupportedOperation();
-            }
-            const cdpConnection = this.page().browser().cdpConnection;
-            return await cdpConnection._createSession({ targetId: this._id });
+            const { sessionId } = await this.client.send('Target.attachToTarget', {
+                targetId: this._id,
+                flatten: true,
+            });
+            await this.browsingContext.subscribe([Bidi.ChromiumBidi.BiDiModule.Cdp]);
+            return new CDPSession_js_1.BidiCdpSession(this, sessionId);
         }
         get #waitForLoad$() { return _private_waitForLoad$_descriptor.value; }
         get #waitForNetworkIdle$() { return _private_waitForNetworkIdle$_descriptor.value; }
@@ -77543,7 +78989,7 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             void httpRequest.finalizeInterceptions();
         });
         this.#request.once('success', data => {
-            this.#response = HTTPResponse_js_1.BidiHTTPResponse.from(data, this, this.#frame.page().browser().cdpSupported);
+            this.#response = HTTPResponse_js_1.BidiHTTPResponse.from(data, this);
         });
         this.#request.on('authenticate', this.#handleAuthentication);
         this.#frame.page().trustedEmitter.emit("request" /* PageEvent.Request */, this);
@@ -77559,25 +79005,16 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         return this.#request.url;
     }
     resourceType() {
-        if (!this.#frame.page().browser().cdpSupported) {
-            throw new Errors_js_1.UnsupportedOperation();
-        }
-        return (this.#request.resourceType || 'other').toLowerCase();
+        throw new Errors_js_1.UnsupportedOperation();
     }
     method() {
         return this.#request.method;
     }
     postData() {
-        if (!this.#frame.page().browser().cdpSupported) {
-            throw new Errors_js_1.UnsupportedOperation();
-        }
-        return this.#request.postData;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     hasPostData() {
-        if (!this.#frame.page().browser().cdpSupported) {
-            throw new Errors_js_1.UnsupportedOperation();
-        }
-        return this.#request.hasPostData;
+        throw new Errors_js_1.UnsupportedOperation();
     }
     async fetchPostData() {
         throw new Errors_js_1.UnsupportedOperation();
@@ -77726,9 +79163,6 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             });
         }
     };
-    timing() {
-        return this.#request.timing();
-    }
 }
 exports.BidiHTTPRequest = BidiHTTPRequest;
 _a = BidiHTTPRequest;
@@ -77800,7 +79234,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiHTTPResponse = void 0;
 const HTTPResponse_js_1 = __webpack_require__(/*! ../api/HTTPResponse.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/api/HTTPResponse.js");
 const Errors_js_1 = __webpack_require__(/*! ../common/Errors.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/Errors.js");
-const SecurityDetails_js_1 = __webpack_require__(/*! ../common/SecurityDetails.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/SecurityDetails.js");
 const decorators_js_1 = __webpack_require__(/*! ../util/decorators.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/util/decorators.js");
 /**
  * @internal
@@ -77816,25 +79249,17 @@ let BidiHTTPResponse = (() => {
             __esDecorate(this, null, _remoteAddress_decorators, { kind: "method", name: "remoteAddress", static: false, private: false, access: { has: obj => "remoteAddress" in obj, get: obj => obj.remoteAddress }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        static from(data, request, cdpSupported) {
-            const response = new BidiHTTPResponse(data, request, cdpSupported);
+        static from(data, request) {
+            const response = new BidiHTTPResponse(data, request);
             response.#initialize();
             return response;
         }
         #data = __runInitializers(this, _instanceExtraInitializers);
         #request;
-        #securityDetails;
-        #cdpSupported = false;
-        constructor(data, request, cdpSupported) {
+        constructor(data, request) {
             super();
             this.#data = data;
             this.#request = request;
-            this.#cdpSupported = cdpSupported;
-            // @ts-expect-error non-standard property.
-            const securityDetails = data['goog:securityDetails'];
-            if (cdpSupported && securityDetails) {
-                this.#securityDetails = new SecurityDetails_js_1.SecurityDetails(securityDetails);
-            }
         }
         #initialize() {
             if (this.#data.fromCache) {
@@ -77862,7 +79287,8 @@ let BidiHTTPResponse = (() => {
         }
         headers() {
             const headers = {};
-            for (const header of this.#data.headers) {
+            // TODO: Remove once the Firefox implementation is compliant with https://w3c.github.io/webdriver-bidi/#get-the-response-data.
+            for (const header of this.#data.headers || []) {
                 // TODO: How to handle Binary Headers
                 // https://w3c.github.io/webdriver-bidi/#type-network-Header
                 if (header.value.type === 'string') {
@@ -77878,30 +79304,8 @@ let BidiHTTPResponse = (() => {
             return this.#data.fromCache;
         }
         timing() {
-            const bidiTiming = this.#request.timing();
-            return {
-                requestTime: bidiTiming.requestTime,
-                proxyStart: -1,
-                proxyEnd: -1,
-                dnsStart: bidiTiming.dnsStart,
-                dnsEnd: bidiTiming.dnsEnd,
-                connectStart: bidiTiming.connectStart,
-                connectEnd: bidiTiming.connectEnd,
-                sslStart: bidiTiming.tlsStart,
-                sslEnd: -1,
-                workerStart: -1,
-                workerReady: -1,
-                workerFetchStart: -1,
-                workerRespondWithSettled: -1,
-                workerRouterEvaluationStart: -1,
-                workerCacheLookupStart: -1,
-                sendStart: bidiTiming.requestStart,
-                sendEnd: -1,
-                pushStart: -1,
-                pushEnd: -1,
-                receiveHeadersStart: bidiTiming.responseStart,
-                receiveHeadersEnd: bidiTiming.responseEnd,
-            };
+            // TODO: File and issue with BiDi spec
+            throw new Errors_js_1.UnsupportedOperation();
         }
         frame() {
             return this.#request.frame();
@@ -77910,10 +79314,7 @@ let BidiHTTPResponse = (() => {
             return false;
         }
         securityDetails() {
-            if (!this.#cdpSupported) {
-                throw new Errors_js_1.UnsupportedOperation();
-            }
-            return this.#securityDetails ?? null;
+            throw new Errors_js_1.UnsupportedOperation();
         }
         buffer() {
             throw new Errors_js_1.UnsupportedOperation();
@@ -79567,17 +80968,11 @@ class BidiRealm extends Realm_js_1.Realm {
                 : `${functionDeclaration}\n${sourceUrlComment}\n`;
             responsePromise = this.realm.callFunction(functionDeclaration, 
             /* awaitPromise= */ true, {
-                // LazyArgs are used only internally and should not affect the order
-                // evaluate calls for the public APIs.
-                arguments: args.some(arg => {
-                    return arg instanceof LazyArg_js_1.LazyArg;
-                })
+                arguments: args.length
                     ? await Promise.all(args.map(arg => {
-                        return this.serializeAsync(arg);
-                    }))
-                    : args.map(arg => {
                         return this.serialize(arg);
-                    }),
+                    }))
+                    : [],
                 resultOwnership,
                 userActivation: true,
                 serializationOptions,
@@ -79598,13 +80993,10 @@ class BidiRealm extends Realm_js_1.Realm {
         }
         return JSHandle_js_1.BidiJSHandle.from(result, this);
     }
-    async serializeAsync(arg) {
+    async serialize(arg) {
         if (arg instanceof LazyArg_js_1.LazyArg) {
             arg = await arg.get(this);
         }
-        return this.serialize(arg);
-    }
-    serialize(arg) {
         if (arg instanceof JSHandle_js_1.BidiJSHandle || arg instanceof ElementHandle_js_1.BidiElementHandle) {
             if (arg.realm !== this) {
                 if (!(arg.realm instanceof BidiFrameRealm) ||
@@ -81546,7 +82938,6 @@ let Request = (() => {
                     return;
                 }
                 this.#response = event.response;
-                this.#event.request.timings = event.request.timings;
                 this.emit('success', this.#response);
                 // In case this is a redirect.
                 if (this.#response.status >= 300 && this.#response.status < 400) {
@@ -81601,18 +82992,6 @@ let Request = (() => {
         get isBlocked() {
             return this.#event.isBlocked;
         }
-        get resourceType() {
-            // @ts-expect-error non-standard attribute.
-            return this.#event.request['goog:resourceType'] ?? undefined;
-        }
-        get postData() {
-            // @ts-expect-error non-standard attribute.
-            return this.#event.request['goog:postData'] ?? undefined;
-        }
-        get hasPostData() {
-            // @ts-expect-error non-standard attribute.
-            return this.#event.request['goog:hasPostData'] ?? false;
-        }
         async continueRequest({ url, method, headers, cookies, body, }) {
             await this.#session.send('network.continueRequest', {
                 request: this.id,
@@ -81658,9 +83037,6 @@ let Request = (() => {
         [(_dispose_decorators = [decorators_js_1.inertIfDisposed], disposable_js_1.disposeSymbol)]() {
             this.#disposables.dispose();
             super[disposable_js_1.disposeSymbol]();
-        }
-        timing() {
-            return this.#event.request.timings;
         }
     };
 })();
@@ -81722,6 +83098,8 @@ const EventEmitter_js_1 = __webpack_require__(/*! ../../common/EventEmitter.js *
 const decorators_js_1 = __webpack_require__(/*! ../../util/decorators.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/util/decorators.js");
 const disposable_js_1 = __webpack_require__(/*! ../../util/disposable.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/util/disposable.js");
 const Browser_js_1 = __webpack_require__(/*! ./Browser.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/bidi/core/Browser.js");
+// TODO: Once Chrome supports session.status properly, uncomment this block.
+// const MAX_RETRIES = 5;
 /**
  * @internal
  */
@@ -81748,6 +83126,24 @@ let Session = (() => {
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static async from(connection, capabilities) {
+            // Wait until the session is ready.
+            //
+            // TODO: Once Chrome supports session.status properly, uncomment this block
+            // and remove `getBiDiConnection` in BrowserConnector.
+            // let status = {message: '', ready: false};
+            // for (let i = 0; i < MAX_RETRIES; ++i) {
+            //   status = (await connection.send('session.status', {})).result;
+            //   if (status.ready) {
+            //     break;
+            //   }
+            //   // Backoff a little bit each time.
+            //   await new Promise(resolve => {
+            //     return setTimeout(resolve, (1 << i) * 100);
+            //   });
+            // }
+            // if (!status.ready) {
+            //   throw new Error(status.message);
+            // }
             const { result } = await connection.send('session.new', {
                 capabilities,
             });
@@ -81957,10 +83353,7 @@ let UserContext = (() => {
         #initialize() {
             const browserEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(this.browser));
             browserEmitter.once('closed', ({ reason }) => {
-                this.dispose(`User context was closed: ${reason}`);
-            });
-            browserEmitter.once('disconnected', ({ reason }) => {
-                this.dispose(`User context was closed: ${reason}`);
+                this.dispose(`User context already closed: ${reason}`);
             });
             const sessionEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(this.#session));
             sessionEmitter.on('browsingContext.contextCreated', info => {
@@ -82186,10 +83579,6 @@ let UserPrompt = (() => {
             return this.closed;
         }
         get handled() {
-            if (this.info.handler === "accept" /* Bidi.Session.UserPromptHandlerType.Accept */ ||
-                this.info.handler === "dismiss" /* Bidi.Session.UserPromptHandlerType.Dismiss */) {
-                return true;
-            }
             return this.#result !== undefined;
         }
         get result() {
@@ -84581,7 +85970,7 @@ exports.DeviceRequestPromptDevice = DeviceRequestPromptDevice;
  * @example
  *
  * ```ts
- * const [devicePrompt] = Promise.all([
+ * const [deviceRequest] = Promise.all([
  *   page.waitForDevicePrompt(),
  *   page.click('#connect-bluetooth'),
  * ]);
@@ -85843,17 +87232,9 @@ class ExecutionContext extends EventEmitter_js_1.EventEmitter {
             callFunctionOnPromise = this.#client.send('Runtime.callFunctionOn', {
                 functionDeclaration: functionDeclarationWithSourceUrl,
                 executionContextId: this.#id,
-                // LazyArgs are used only internally and should not affect the order
-                // evaluate calls for the public APIs.
-                arguments: args.some(arg => {
-                    return arg instanceof LazyArg_js_1.LazyArg;
-                })
-                    ? await Promise.all(args.map(arg => {
-                        return convertArgumentAsync(this, arg);
-                    }))
-                    : args.map(arg => {
-                        return convertArgument(this, arg);
-                    }),
+                arguments: args.length
+                    ? await Promise.all(args.map(convertArgument.bind(this)))
+                    : [],
                 returnByValue,
                 awaitPromise: true,
                 userGesture: true,
@@ -85873,13 +87254,10 @@ class ExecutionContext extends EventEmitter_js_1.EventEmitter {
         return returnByValue
             ? (0, utils_js_1.valueFromRemoteObject)(remoteObject)
             : this.#world.createCdpHandle(remoteObject);
-        async function convertArgumentAsync(context, arg) {
+        async function convertArgument(arg) {
             if (arg instanceof LazyArg_js_1.LazyArg) {
-                arg = await arg.get(context);
+                arg = await arg.get(this);
             }
-            return convertArgument(context, arg);
-        }
-        function convertArgument(context, arg) {
             if (typeof arg === 'bigint') {
                 // eslint-disable-line valid-typeof
                 return { unserializableValue: `${arg.toString()}n` };
@@ -85900,7 +87278,7 @@ class ExecutionContext extends EventEmitter_js_1.EventEmitter {
                 ? arg
                 : null;
             if (objectHandle) {
-                if (objectHandle.realm !== context.#world) {
+                if (objectHandle.realm !== this.#world) {
                     throw new Error('JSHandles can be evaluated only in the context they were created!');
                 }
                 if (objectHandle.disposed) {
@@ -86486,8 +87864,8 @@ let CdpFrame = (() => {
             }
         }
         async waitForNavigation(options = {}) {
-            const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), signal, } = options;
-            const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout, signal);
+            const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), } = options;
+            const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout);
             const error = await Deferred_js_1.Deferred.race([
                 watcher.terminationPromise(),
                 ...(options.ignoreSameDocumentNavigation
@@ -88419,7 +89797,7 @@ class LifecycleWatcher {
     #hasSameDocumentNavigation;
     #swapped;
     #navigationResponseReceived;
-    constructor(networkManager, frame, waitUntil, timeout, signal) {
+    constructor(networkManager, frame, waitUntil, timeout) {
         if (Array.isArray(waitUntil)) {
             waitUntil = waitUntil.slice();
         }
@@ -88431,9 +89809,6 @@ class LifecycleWatcher {
             const protocolEvent = puppeteerToProtocolLifecycle.get(value);
             (0, assert_js_1.assert)(protocolEvent, 'Unknown value for options.waitUntil: ' + value);
             return protocolEvent;
-        });
-        signal?.addEventListener('abort', () => {
-            this.#terminationDeferred.reject(signal.reason);
         });
         this.#frame = frame;
         this.#timeout = timeout;
@@ -88537,6 +89912,10 @@ class LifecycleWatcher {
                     return false;
                 }
             }
+            // TODO(#1): Its possible we don't need this check
+            // CDP provided the correct order for Loading Events
+            // And NetworkIdle is a global state
+            // Consider removing
             for (const child of frame.childFrames()) {
                 if (child._hasStartedLoading &&
                     !checkLifecycle(child, expectedLifecycle)) {
@@ -89265,7 +90644,6 @@ const CDPSession_js_1 = __webpack_require__(/*! ../api/CDPSession.js */ "./node_
 const Page_js_1 = __webpack_require__(/*! ../api/Page.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js");
 const ConsoleMessage_js_1 = __webpack_require__(/*! ../common/ConsoleMessage.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/ConsoleMessage.js");
 const Errors_js_1 = __webpack_require__(/*! ../common/Errors.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/Errors.js");
-const EventEmitter_js_1 = __webpack_require__(/*! ../common/EventEmitter.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/EventEmitter.js");
 const FileChooser_js_1 = __webpack_require__(/*! ../common/FileChooser.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/FileChooser.js");
 const NetworkManagerEvents_js_1 = __webpack_require__(/*! ../common/NetworkManagerEvents.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/NetworkManagerEvents.js");
 const util_js_1 = __webpack_require__(/*! ../common/util.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/util.js");
@@ -89339,6 +90717,84 @@ class CdpPage extends Page_js_1.Page {
     #sessionCloseDeferred = Deferred_js_1.Deferred.create();
     #serviceWorkerBypassed = false;
     #userDragInterceptionEnabled = false;
+    #frameManagerHandlers = [
+        [
+            FrameManagerEvents_js_1.FrameManagerEvent.FrameAttached,
+            (frame) => {
+                this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
+            },
+        ],
+        [
+            FrameManagerEvents_js_1.FrameManagerEvent.FrameDetached,
+            (frame) => {
+                this.emit("framedetached" /* PageEvent.FrameDetached */, frame);
+            },
+        ],
+        [
+            FrameManagerEvents_js_1.FrameManagerEvent.FrameNavigated,
+            (frame) => {
+                this.emit("framenavigated" /* PageEvent.FrameNavigated */, frame);
+            },
+        ],
+    ];
+    #networkManagerHandlers = [
+        [
+            NetworkManagerEvents_js_1.NetworkManagerEvent.Request,
+            (request) => {
+                this.emit("request" /* PageEvent.Request */, request);
+            },
+        ],
+        [
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestServedFromCache,
+            (request) => {
+                this.emit("requestservedfromcache" /* PageEvent.RequestServedFromCache */, request);
+            },
+        ],
+        [
+            NetworkManagerEvents_js_1.NetworkManagerEvent.Response,
+            (response) => {
+                this.emit("response" /* PageEvent.Response */, response);
+            },
+        ],
+        [
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFailed,
+            (request) => {
+                this.emit("requestfailed" /* PageEvent.RequestFailed */, request);
+            },
+        ],
+        [
+            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFinished,
+            (request) => {
+                this.emit("requestfinished" /* PageEvent.RequestFinished */, request);
+            },
+        ],
+    ];
+    #sessionHandlers = [
+        [
+            CDPSession_js_1.CDPSessionEvent.Disconnected,
+            () => {
+                this.#sessionCloseDeferred.reject(new Errors_js_1.TargetCloseError('Target closed'));
+            },
+        ],
+        [
+            'Page.domContentEventFired',
+            () => {
+                return this.emit("domcontentloaded" /* PageEvent.DOMContentLoaded */, undefined);
+            },
+        ],
+        [
+            'Page.loadEventFired',
+            () => {
+                return this.emit("load" /* PageEvent.Load */, undefined);
+            },
+        ],
+        ['Page.javascriptDialogOpening', this.#onDialog.bind(this)],
+        ['Runtime.exceptionThrown', this.#handleException.bind(this)],
+        ['Inspector.targetCrashed', this.#onTargetCrashed.bind(this)],
+        ['Performance.metrics', this.#emitMetrics.bind(this)],
+        ['Log.entryAdded', this.#onLogEntryAdded.bind(this)],
+        ['Page.fileChooserOpened', this.#onFileChooser.bind(this)],
+    ];
     constructor(client, target) {
         super();
         this.#primaryTargetClient = client;
@@ -89356,38 +90812,19 @@ class CdpPage extends Page_js_1.Page {
         this.#tracing = new Tracing_js_1.Tracing(client);
         this.#coverage = new Coverage_js_1.Coverage(client);
         this.#viewport = null;
-        const frameManagerEmitter = new EventEmitter_js_1.EventEmitter(this.#frameManager);
-        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameAttached, frame => {
-            this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
-        });
-        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameDetached, frame => {
-            this.emit("framedetached" /* PageEvent.FrameDetached */, frame);
-        });
-        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameNavigated, frame => {
-            this.emit("framenavigated" /* PageEvent.FrameNavigated */, frame);
-        });
-        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.ConsoleApiCalled, ([world, event]) => {
+        for (const [eventName, handler] of this.#frameManagerHandlers) {
+            this.#frameManager.on(eventName, handler);
+        }
+        this.#frameManager.on(FrameManagerEvents_js_1.FrameManagerEvent.ConsoleApiCalled, ([world, event]) => {
             this.#onConsoleAPI(world, event);
         });
-        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.BindingCalled, ([world, event]) => {
+        this.#frameManager.on(FrameManagerEvents_js_1.FrameManagerEvent.BindingCalled, ([world, event]) => {
             void this.#onBindingCalled(world, event);
         });
-        const networkManagerEmitter = new EventEmitter_js_1.EventEmitter(this.#frameManager.networkManager);
-        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.Request, request => {
-            this.emit("request" /* PageEvent.Request */, request);
-        });
-        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestServedFromCache, request => {
-            this.emit("requestservedfromcache" /* PageEvent.RequestServedFromCache */, request);
-        });
-        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.Response, response => {
-            this.emit("response" /* PageEvent.Response */, response);
-        });
-        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFailed, request => {
-            this.emit("requestfailed" /* PageEvent.RequestFailed */, request);
-        });
-        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFinished, request => {
-            this.emit("requestfinished" /* PageEvent.RequestFinished */, request);
-        });
+        for (const [eventName, handler] of this.#networkManagerHandlers) {
+            // TODO: Remove any.
+            this.#frameManager.networkManager.on(eventName, handler);
+        }
         this.#tabTargetClient.on(CDPSession_js_1.CDPSessionEvent.Swapped, this.#onActivation.bind(this));
         this.#tabTargetClient.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onSecondaryTarget.bind(this));
         this.#targetManager.on("targetGone" /* TargetManagerEvent.TargetGone */, this.#onDetachedFromTarget);
@@ -89449,23 +90886,11 @@ class CdpPage extends Page_js_1.Page {
      * during a navigation to a prerended page.
      */
     #setupPrimaryTargetListeners() {
-        const clientEmitter = new EventEmitter_js_1.EventEmitter(this.#primaryTargetClient);
-        clientEmitter.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onAttachedToTarget);
-        clientEmitter.on(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
-            this.#sessionCloseDeferred.reject(new Errors_js_1.TargetCloseError('Target closed'));
-        });
-        clientEmitter.on('Page.domContentEventFired', () => {
-            this.emit("domcontentloaded" /* PageEvent.DOMContentLoaded */, undefined);
-        });
-        clientEmitter.on('Page.loadEventFired', () => {
-            this.emit("load" /* PageEvent.Load */, undefined);
-        });
-        clientEmitter.on('Page.javascriptDialogOpening', this.#onDialog.bind(this));
-        clientEmitter.on('Runtime.exceptionThrown', this.#handleException.bind(this));
-        clientEmitter.on('Inspector.targetCrashed', this.#onTargetCrashed.bind(this));
-        clientEmitter.on('Performance.metrics', this.#emitMetrics.bind(this));
-        clientEmitter.on('Log.entryAdded', this.#onLogEntryAdded.bind(this));
-        clientEmitter.on('Page.fileChooserOpened', this.#onFileChooser.bind(this));
+        this.#primaryTargetClient.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onAttachedToTarget);
+        for (const [eventName, handler] of this.#sessionHandlers) {
+            // TODO: Remove any.
+            this.#primaryTargetClient.on(eventName, handler);
+        }
     }
     #onDetachedFromTarget = (target) => {
         const sessionId = target._session()?.id();
@@ -89661,16 +91086,7 @@ class CdpPage extends Page_js_1.Page {
             }
             return cookie;
         };
-        return originalCookies.map(filterUnsupportedAttributes).map(cookie => {
-            return {
-                ...cookie,
-                // TODO: a breaking change is needed in Puppeteer types to support other
-                // partition keys.
-                partitionKey: cookie.partitionKey
-                    ? cookie.partitionKey.topLevelSite
-                    : undefined,
-            };
-        });
+        return originalCookies.map(filterUnsupportedAttributes);
     }
     async deleteCookie(...cookies) {
         const pageURL = this.url();
@@ -89697,19 +91113,7 @@ class CdpPage extends Page_js_1.Page {
         await this.deleteCookie(...items);
         if (items.length) {
             await this.#primaryTargetClient.send('Network.setCookies', {
-                cookies: items.map(cookieParam => {
-                    return {
-                        ...cookieParam,
-                        partitionKey: cookieParam.partitionKey
-                            ? {
-                                // TODO: a breaking change neeeded to change the partition key
-                                // type in Puppeteer.
-                                topLevelSite: cookieParam.partitionKey,
-                                hasCrossSiteAncestor: false,
-                            }
-                            : undefined,
-                    };
-                }),
+                cookies: items,
             });
         }
     }
@@ -92677,198 +94081,6 @@ const knownDevices = [
         },
     },
     {
-        name: 'iPhone 14',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 390,
-            height: 663,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 14 landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 750,
-            height: 340,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 14 Plus',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 428,
-            height: 745,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 14 Plus landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 832,
-            height: 378,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 14 Pro',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 393,
-            height: 659,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 14 Pro landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 734,
-            height: 343,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 14 Pro Max',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 430,
-            height: 739,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 14 Pro Max landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 814,
-            height: 380,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 15',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 393,
-            height: 659,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 15 landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 734,
-            height: 343,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 15 Plus',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 430,
-            height: 739,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 15 Plus landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 814,
-            height: 380,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 15 Pro',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 393,
-            height: 659,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 15 Pro landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 734,
-            height: 343,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
-        name: 'iPhone 15 Pro Max',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 430,
-            height: 739,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: false,
-        },
-    },
-    {
-        name: 'iPhone 15 Pro Max landscape',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-        viewport: {
-            width: 814,
-            height: 380,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-            isLandscape: true,
-        },
-    },
-    {
         name: 'JioPhone 2',
         userAgent: 'Mozilla/5.0 (Mobile; LYF/F300B/LYF-F300B-001-01-15-130718-i;Android; rv:48.0) Gecko/48.0 Firefox/48.0 KAIOS/2.5',
         viewport: {
@@ -93372,7 +94584,7 @@ for (const device of knownDevices) {
  *
  * ```ts
  * import {KnownDevices} from 'puppeteer';
- * const iPhone = KnownDevices['iPhone 15 Pro'];
+ * const iPhone = KnownDevices['iPhone 6'];
  *
  * (async () => {
  *   const browser = await puppeteer.launch();
@@ -93506,7 +94718,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.EventEmitter = void 0;
+exports.EventSubscription = exports.EventEmitter = void 0;
 const mitt_js_1 = __importDefault(__webpack_require__(/*! ../../third_party/mitt/mitt.js */ "./node_modules/puppeteer-core/lib/cjs/third_party/mitt/mitt.js"));
 const disposable_js_1 = __webpack_require__(/*! ../util/disposable.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/util/disposable.js");
 /**
@@ -93630,6 +94842,24 @@ class EventEmitter {
     }
 }
 exports.EventEmitter = EventEmitter;
+/**
+ * @internal
+ */
+class EventSubscription {
+    #target;
+    #type;
+    #handler;
+    constructor(target, type, handler) {
+        this.#target = target;
+        this.#type = type;
+        this.#handler = handler;
+        this.#target.on(this.#type, this.#handler);
+    }
+    [disposable_js_1.disposeSymbol]() {
+        this.#target.off(this.#type, this.#handler);
+    }
+}
+exports.EventSubscription = EventSubscription;
 //# sourceMappingURL=EventEmitter.js.map
 
 /***/ }),
@@ -95659,7 +96889,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.filterAsync = exports.fromAbortSignal = exports.fromEmitterEvent = exports.unitToPixels = exports.parsePDFOptions = exports.NETWORK_IDLE_TIME = exports.getSourceUrlComment = exports.SOURCE_URL_REGEX = exports.UTILITY_WORLD_NAME = exports.timeout = exports.validateDialogType = exports.getReadableFromProtocolStream = exports.getReadableAsBuffer = exports.importFSPromises = exports.evaluationString = exports.isDate = exports.isRegExp = exports.isPlainObject = exports.isNumber = exports.isString = exports.getSourcePuppeteerURLIfAvailable = exports.withSourcePuppeteerURLIfNone = exports.PuppeteerURL = exports.DEFAULT_VIEWPORT = exports.debugError = void 0;
 const rxjs_js_1 = __webpack_require__(/*! ../../third_party/rxjs/rxjs.js */ "./node_modules/puppeteer-core/lib/cjs/third_party/rxjs/rxjs.js");
-const version_js_1 = __webpack_require__(/*! ../generated/version.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/generated/version.js");
 const assert_js_1 = __webpack_require__(/*! ../util/assert.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/util/assert.js");
 const Debug_js_1 = __webpack_require__(/*! ./Debug.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/Debug.js");
 const Errors_js_1 = __webpack_require__(/*! ./Errors.js */ "./node_modules/puppeteer-core/lib/cjs/puppeteer/common/Errors.js");
@@ -95923,7 +97152,7 @@ exports.timeout = timeout;
 /**
  * @internal
  */
-exports.UTILITY_WORLD_NAME = '__puppeteer_utility_world__' + version_js_1.packageVersion;
+exports.UTILITY_WORLD_NAME = '__puppeteer_utility_world__';
 /**
  * @internal
  */
@@ -96134,7 +97363,7 @@ exports.packageVersion = void 0;
 /**
  * @internal
  */
-exports.packageVersion = '22.15.0';
+exports.packageVersion = '22.13.0';
 //# sourceMappingURL=version.js.map
 
 /***/ }),
@@ -96591,7 +97820,7 @@ class FirefoxLauncher extends ProductLauncher_js_1.ProductLauncher {
         if (profileArgIndex !== -1) {
             userDataDir = firefoxArguments[profileArgIndex + 1];
             if (!userDataDir) {
-                throw new Error(`Missing value for profile command line argument`);
+                throw new Error(`Firefox profile not found at '${userDataDir}'`);
             }
             // When using a custom Firefox profile it needs to be populated
             // with required preferences.
@@ -96667,7 +97896,7 @@ class FirefoxLauncher extends ProductLauncher_js_1.ProductLauncher {
     }
     defaultArgs(options = {}) {
         const { devtools = false, headless = !devtools, args = [], userDataDir = null, } = options;
-        const firefoxArguments = [];
+        const firefoxArguments = ['--no-remote'];
         switch (os_1.default.platform()) {
             case 'darwin':
                 firefoxArguments.push('--foreground');
@@ -96817,24 +98046,16 @@ class PipeTransport {
     onmessage;
     constructor(pipeWrite, pipeRead) {
         this.#pipeWrite = pipeWrite;
-        const pipeReadEmitter = this.#subscriptions.use(
-        // NodeJS event emitters don't support `*` so we need to typecast
-        // As long as we don't use it we should be OK.
-        new EventEmitter_js_1.EventEmitter(pipeRead));
-        pipeReadEmitter.on('data', (buffer) => {
+        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'data', (buffer) => {
             return this.#dispatch(buffer);
-        });
-        pipeReadEmitter.on('close', () => {
+        }));
+        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'close', () => {
             if (this.onclose) {
                 this.onclose.call(null);
             }
-        });
-        pipeReadEmitter.on('error', util_js_1.debugError);
-        const pipeWriteEmitter = this.#subscriptions.use(
-        // NodeJS event emitters don't support `*` so we need to typecast
-        // As long as we don't use it we should be OK.
-        new EventEmitter_js_1.EventEmitter(pipeRead));
-        pipeWriteEmitter.on('error', util_js_1.debugError);
+        }));
+        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'error', util_js_1.debugError));
+        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeWrite, 'error', util_js_1.debugError));
     }
     send(message) {
         (0, assert_js_1.assert)(!this.#isClosed, '`PipeTransport` is closed.');
@@ -97107,7 +98328,6 @@ class ProductLauncher {
         });
         return await BiDi.BidiBrowser.create({
             connection: bidiConnection,
-            cdpConnection: connection,
             closeCallback,
             process: browserProcess.nodeProcess,
             defaultViewport: opts.defaultViewport,
@@ -97869,8 +99089,8 @@ exports.PUPPETEER_REVISIONS = void 0;
  * @internal
  */
 exports.PUPPETEER_REVISIONS = Object.freeze({
-    chrome: '127.0.6533.88',
-    'chrome-headless-shell': '127.0.6533.88',
+    chrome: '126.0.6478.126',
+    'chrome-headless-shell': '126.0.6478.126',
     firefox: 'latest',
 });
 //# sourceMappingURL=revisions.js.map
