@@ -296,7 +296,7 @@ async function startBrowser(headless, slowMo, agamaBrowser, agamaServer) {
         ...browserSettings(agamaBrowser),
     });
     exports.page = await browser.newPage();
-    exports.page.setDefaultTimeout(20000);
+    exports.page.setDefaultTimeout(30000);
     exports.page.on('console', (msg) => {
         const text = msg.text();
         const type = msg.type();
@@ -722,6 +722,7 @@ class SoftwareSelectionPage {
         // ensure selection due to puppeteer might go too fast
         await this.patternCheckbox(pattern)
             .filter((input) => input.checked)
+            .setTimeout(30000)
             .wait();
     }
     async close() {

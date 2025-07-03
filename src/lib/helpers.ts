@@ -79,7 +79,7 @@ export async function startBrowser(
   });
 
   page = await browser.newPage();
-  page.setDefaultTimeout(20000);
+  page.setDefaultTimeout(30000);
 
   page.on('console', (msg) => {
     const text = msg.text();

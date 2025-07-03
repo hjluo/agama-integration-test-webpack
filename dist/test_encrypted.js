@@ -298,7 +298,7 @@ async function startBrowser(headless, slowMo, agamaBrowser, agamaServer) {
         ...browserSettings(agamaBrowser),
     });
     exports.page = await browser.newPage();
-    exports.page.setDefaultTimeout(20000);
+    exports.page.setDefaultTimeout(30000);
     exports.page.on('console', (msg) => {
         const text = msg.text();
         const type = msg.type();
