@@ -650,6 +650,7 @@ class SoftwareSelectionPage {
         // ensure selection due to puppeteer might go too fast
         await this.patternCheckbox(pattern)
             .filter((input) => input.checked)
+            .setTimeout(30000)
             .wait();
     }
     async close() {
