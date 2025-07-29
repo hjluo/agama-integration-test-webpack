@@ -1324,12 +1324,13 @@ const options = (0, cmdline_1.parse)((cmd) => cmd
     .addOption(new commander_1.Option("--prepare-advanced-storage <storage-type>", "Prepare advance storage for installation").choices(["dasd", "zfcp"])));
 (0, helpers_1.test_init)(options);
 (0, login_1.logIn)(options.password);
-if (options.productId !== "none")
+if (options.productId !== "none") {
     if (options.acceptLicense)
         (0, product_selection_1.productSelectionWithLicense)(options.productId);
     else
         (0, product_selection_1.productSelection)(options.productId);
-(0, configuration_started_1.ensureProductConfigurationStarted)();
+    (0, configuration_started_1.ensureProductConfigurationStarted)();
+}
 if (options.registrationCode)
     if (options.instRegisterUrl)
         (0, registration_1.enterRegistrationRegUrl)(options.registrationCode);

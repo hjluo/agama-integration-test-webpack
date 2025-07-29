@@ -48,10 +48,12 @@ const options = parse((cmd) =>
 
 test_init(options);
 logIn(options.password);
-if (options.productId !== "none")
+if (options.productId !== "none") {
   if (options.acceptLicense) productSelectionWithLicense(options.productId);
   else productSelection(options.productId);
-ensureProductConfigurationStarted();
+  ensureProductConfigurationStarted();
+}
+
 if (options.registrationCode)
   if (options.instRegisterUrl) enterRegistrationRegUrl(options.registrationCode);
   else enterRegistration(options.registrationCode);
