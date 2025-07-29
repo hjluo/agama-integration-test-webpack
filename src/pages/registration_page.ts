@@ -1,14 +1,15 @@
-import { Locator, type Page } from "puppeteer-core";
+import { type Page } from "puppeteer-core";
 import { type GConstructor } from "../lib/helpers";
 
 class RegistrationBasePage {
   protected readonly page: Page;
-  protected readonly codeInput: () => Locator<HTMLInputElement>;
-  protected readonly registerButton = () => this.page.locator("button::-p-text(Register)");
+  protected readonly codeInput = () => this.page.locator("::-p-aria(Registration code)");
+  protected readonly registerButton = () => this.page.locator("::-p-aria(Register)");
   protected readonly extensionRegisteredText = () =>
     this.page.locator("::-p-text(The extension has been registered)");
 
-  protected readonly registrationOptionCheckbox = () => this.page.locator("input#provide-code");
+  protected readonly registrationOptionCheckbox = () =>
+    this.page.locator("::-p-aria(Provide registration code)");
 
   constructor(page: Page) {
     this.page = page;
@@ -16,10 +17,16 @@ class RegistrationBasePage {
 
   async provideRegistrationCode() {
     await this.registrationOptionCheckbox().click();
+    console.log("clicked registrationOptionCheckbox");
   }
 
   async fillCode(code: string) {
-    await this.codeInput().fill(code);
+    console.log(`start code=${code}`);
+    await this.codeInput().wait();
+    console.log("waited Registration code");
+    // await this.codeInput().fill(code);
+    await this.page.locator("aria/Registration code").fill(code);
+    console.log("this.codeInput filled code");
   }
 
   async register() {
@@ -28,14 +35,11 @@ class RegistrationBasePage {
 }
 
 function ProductRegistrable<TBase extends GConstructor<RegistrationBasePage>>(Base: TBase) {
-  return class extends Base {
-    codeInput = () => this.page.locator(`input[id="code"], input[id="key"]`);
-  };
+  return class extends Base {};
 }
 
 function ExtensionHaRegistrable<TBase extends GConstructor<RegistrationBasePage>>(Base: TBase) {
   return class extends Base {
-    codeInput = () => this.page.locator("input[id^='input-reg-code-sle-ha-16.']");
     extensionRegisteredText = () =>
       this.page.locator("::-p-text(The extension has been registered)");
 
