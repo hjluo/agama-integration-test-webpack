@@ -642,6 +642,7 @@ class RegistrationBasePage {
     infoHasBeenRegisteredText = () => this.page.locator("::-p-text(has been registered with below information)");
     registerButton = () => this.page.locator("::-p-aria(Register)");
     registrationOptionCheckbox = () => this.page.locator("::-p-aria(Provide registration code)");
+    warningAlertRegistration = () => this.page.locator(`::-p-text(Connection to registration server failed)`);
     constructor(page) {
         this.page = page;
     }

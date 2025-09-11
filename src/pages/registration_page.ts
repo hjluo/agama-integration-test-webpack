@@ -14,6 +14,9 @@ class RegistrationBasePage {
   protected readonly registrationOptionCheckbox = () =>
     this.page.locator("::-p-aria(Provide registration code)");
 
+  private readonly warningAlertRegistration = () =>
+    this.page.locator(`::-p-text(Connection to registration server failed)`);
+
   constructor(page: Page) {
     this.page = page;
   }
