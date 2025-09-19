@@ -1,5 +1,4 @@
 import { it, page, getTextContent } from "../lib/helpers";
-import { OverviewPage } from "../pages/overview_page";
 import {
   ProductRegistrationPage,
   ExtensionHaRegistrationPage,
@@ -8,6 +7,7 @@ import {
 } from "../pages/registration_page";
 import assert from "node:assert/strict";
 
+import { TrustRegistrationCertificatePage } from "../pages/trust_registration_certificate_page";
 import { TrustKeyPage } from "../pages/trust_key_page";
 import { SidebarWithRegistrationPage } from "../pages/sidebar_page";
 
@@ -43,8 +43,27 @@ export function enterRegistration({
       await productRegistration.fillCode(code);
     }
     await productRegistration.register();
-    await new OverviewPage(page).waitVisible(40000);
   });
+
+  if (url?.startsWith("https")) {
+    it("should handle HTTPS certificate trust for custom registration server", async function () {
+      const trustRegistration = new TrustRegistrationCertificatePage(page);
+      assert.deepEqual(
+        await getTextContent(trustRegistration.titleText()),
+        "Registration certificate",
+      );
+      assert.deepEqual(
+        await getTextContent(trustRegistration.questionText()),
+        "Trying to import a self signed certificate. Do you want to trust it and register the product?",
+      );
+      assert.deepEqual(
+        await getTextContent(trustRegistration.issuerText()),
+        "RMT Certificate Authority",
+      );
+      assert.deepEqual(await getTextContent(trustRegistration.urlText(url)), url);
+      await trustRegistration.trustCertificate();
+    });
+  }
 
   it("should display product has been registered", async function () {
     const sidebar = new SidebarWithRegistrationPage(page);
