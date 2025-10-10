@@ -404,8 +404,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
-    // base file name for the dumps
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
     const html = await exports.page.content();
@@ -432,7 +433,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
@@ -735,9 +736,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.StoragePage = void 0;
 const assert_1 = __importDefault(__webpack_require__(/*! assert */ "assert"));
+const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
 class StoragePage {
     page;
     selectMoreDevicesButton = () => this.page.locator("::-p-text(More devices)");
+    changeButton = () => this.page.locator("::-p-text(Change)");
+    selectDiskToInstallButton = () => this.page.locator("::-p-text(Select a disk to install the system)");
     editEncryptionButton = () => this.page.locator("::-p-text(Edit)");
     encryptionIsEnabledText = () => this.page.locator("::-p-text(Encryption is enabled)");
     encryptionIsDisabledText = () => this.page.locator("::-p-text(Encryption is disabled)");
@@ -746,6 +750,7 @@ class StoragePage {
     addLvmVolumeLink = () => this.page.locator("::-p-text(Add LVM volume group)");
     destructiveActionsList = () => this.page.locator("::-p-text(Check)");
     destructiveActionText = (name) => this.page.locator(`::-p-text(Delete ${name})`);
+    alertFailedCalculateStorageLayout = () => this.page.locator("::-p-text(Failed to calculate a storage layout)");
     constructor(page) {
         this.page = page;
     }
@@ -767,6 +772,9 @@ class StoragePage {
             .wait();
         await assert_1.default.deepEqual(elementText, "Encryption is disabled");
     }
+    async verifySpaceAllocationFailed() {
+        assert_1.default.match(await (0, helpers_1.getTextContent)(this.alertFailedCalculateStorageLayout()), /Failed to calculate a storage layout/);
+    }
     async manageDasd() {
         await this.manageDasdLink().click();
     }
@@ -781,6 +789,12 @@ class StoragePage {
     }
     async verifyDestructiveAction(action) {
         await this.destructiveActionText(action).wait();
+    }
+    async changeDevice() {
+        await this.changeButton().click();
+    }
+    async selectAnotherDisk() {
+        await this.selectDiskToInstallButton().click();
     }
 }
 exports.StoragePage = StoragePage;

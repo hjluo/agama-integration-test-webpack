@@ -448,6 +448,50 @@ function verifyPasswordStrength() {
 
 /***/ }),
 
+/***/ "./src/checks/storage_change_device_to_install.ts":
+/*!********************************************************!*\
+  !*** ./src/checks/storage_change_device_to_install.ts ***!
+  \********************************************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.changeDeviceToInstall = changeDeviceToInstall;
+const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
+const sidebar_page_1 = __webpack_require__(/*! ../pages/sidebar_page */ "./src/pages/sidebar_page.ts");
+const storage_page_1 = __webpack_require__(/*! ../pages/storage_page */ "./src/pages/storage_page.ts");
+const select_device_to_install_page_1 = __webpack_require__(/*! ../pages/select_device_to_install_page */ "./src/pages/select_device_to_install_page.ts");
+function changeDeviceToInstall() {
+    (0, helpers_1.it)("should change device to install for warning test", async function () {
+        const storage = new storage_page_1.StoragePage(helpers_1.page);
+        const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
+        const selectDevice = new select_device_to_install_page_1.SelectDeviceToInstallPage(helpers_1.page);
+        await sidebar.goToStorage();
+        await storage.changeDevice();
+        await storage.selectAnotherDisk();
+        console.log("111 Before click vdb");
+        await selectDevice.selectDevice("/dev/vdb");
+        console.log("222 After click vdb");
+        await storage.verifySpaceAllocationFailed();
+        console.log("333 Verified space allocation failed.");
+    });
+    (0, helpers_1.it)("should change device back to install", async function () {
+        const storage = new storage_page_1.StoragePage(helpers_1.page);
+        const selectDevice = new select_device_to_install_page_1.SelectDeviceToInstallPage(helpers_1.page);
+        const sidebar = new sidebar_page_1.SidebarPage(helpers_1.page);
+        await sidebar.goToStorage();
+        await storage.changeDevice();
+        await storage.selectAnotherDisk();
+        console.log("44 select /dev/vda");
+        await selectDevice.selectDevice("/dev/vda");
+        console.log("55 select /dev/vda done.");
+    });
+}
+
+
+/***/ }),
+
 /***/ "./src/checks/storage_result_destructive_actions_planned.ts":
 /*!******************************************************************!*\
   !*** ./src/checks/storage_result_destructive_actions_planned.ts ***!
@@ -774,8 +818,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
-    // base file name for the dumps
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
     const html = await exports.page.content();
@@ -802,7 +847,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
@@ -1416,6 +1461,98 @@ exports.SetARootPasswordPage = SetARootPasswordPage;
 
 /***/ }),
 
+/***/ "./src/pages/select_device_to_install_page.ts":
+/*!****************************************************!*\
+  !*** ./src/pages/select_device_to_install_page.ts ***!
+  \****************************************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SelectDeviceToInstallPage = void 0;
+const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
+class SelectDeviceToInstallPage {
+    page;
+    deviceRadio = (deviceName) => this.page.locator(`xpath=//tr[contains(., "${deviceName}")]//input[@type="radio"]`);
+    confirmButton = () => this.page.locator("button::-p-text(Confirm)");
+    constructor(page) {
+        this.page = page;
+    }
+    async waitForDialog() {
+        await this.page.waitForSelector("[role=dialog]", { visible: true });
+    }
+    async waitForGrid() {
+        await this.page.waitForSelector("[role=grid]", { visible: true });
+    }
+    async getAllRows() {
+        return await this.page.$$("[role=grid] tbody tr");
+    }
+    async getTableCell(rowIndex, colIndex) {
+        // Get all data rows from tbody (excluding header)
+        const rows = await this.page.$$("[role=grid] tbody tr");
+        if (rowIndex >= rows.length || rowIndex < 0) {
+            console.log(`Row index ${rowIndex} out of bounds (total rows: ${rows.length})`);
+            return null;
+        }
+        // Get the specific row
+        const row = rows[rowIndex];
+        // Get all cells in that row
+        const cells = await row.$$("td");
+        if (colIndex >= cells.length || colIndex < 0) {
+            console.log(`Column index ${colIndex} out of bounds (total columns: ${cells.length})`);
+            return null;
+        }
+        // Get the specific cell
+        const cell = cells[colIndex];
+        const cellText = await cell.evaluate((el) => el.textContent?.trim());
+        return cellText || null;
+    }
+    async selectDevice(name) {
+        const logDir = "/run/agama/scripts";
+        const deviceName = name.split("/").pop() || name;
+        console.log("Waiting for dialog...");
+        await this.waitForDialog();
+        console.log("Waiting for grid...");
+        await this.waitForGrid();
+        console.log("===============print header=====================");
+        const headers = await this.page.$$eval('[role="grid"] th', (elements) => elements.map((el) => el.textContent.trim()));
+        console.log(headers);
+        console.log("===============end header=====================");
+        await (0, helpers_1.dumpPage)(logDir, `before_select_${deviceName}`);
+        // Get all rows from tbody elements (not thead)
+        const rows = await this.page.$$("[role=grid] tbody tr");
+        console.log(`Found ${rows.length} data rows`);
+        for (const row of rows) {
+            const text = await row.evaluate((el) => el.textContent);
+            const ariaLabel = await row.evaluate((el) => el.getAttribute("aria-label"));
+            console.log("Row text:", text);
+            console.log("Label text:", ariaLabel);
+            console.log("---------------------------");
+        }
+        const cellValue0 = await this.getTableCell(0, 2);
+        console.log("Cell (0,2) value:", cellValue0);
+        const cellValue1 = await this.getTableCell(0, 3);
+        console.log("Cell (0,3) value:", cellValue1);
+        const cellValue2 = await this.getTableCell(0, 4);
+        console.log("Cell (0,4) value:", cellValue2);
+        const cellValue3 = await this.getTableCell(0, 5);
+        console.log("Cell (0,5) value:", cellValue3);
+        console.log("+++++++++++++++++++++++++++++++");
+        console.log(`Looking for device: ${name}`);
+        await this.deviceRadio(name).click();
+        console.log(`got ${name}, taking screenshot`);
+        await (0, helpers_1.dumpPage)(logDir, `after_select_${deviceName}`);
+        console.log("Clicking confirm...");
+        await this.confirmButton().click();
+        console.log(`Done click radio button for ${deviceName} baby`);
+    }
+}
+exports.SelectDeviceToInstallPage = SelectDeviceToInstallPage;
+
+
+/***/ }),
+
 /***/ "./src/pages/setup_root_user_authentication_page.ts":
 /*!**********************************************************!*\
   !*** ./src/pages/setup_root_user_authentication_page.ts ***!
@@ -1522,9 +1659,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.StoragePage = void 0;
 const assert_1 = __importDefault(__webpack_require__(/*! assert */ "assert"));
+const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
 class StoragePage {
     page;
     selectMoreDevicesButton = () => this.page.locator("::-p-text(More devices)");
+    changeButton = () => this.page.locator("::-p-text(Change)");
+    selectDiskToInstallButton = () => this.page.locator("::-p-text(Select a disk to install the system)");
     editEncryptionButton = () => this.page.locator("::-p-text(Edit)");
     encryptionIsEnabledText = () => this.page.locator("::-p-text(Encryption is enabled)");
     encryptionIsDisabledText = () => this.page.locator("::-p-text(Encryption is disabled)");
@@ -1533,6 +1673,7 @@ class StoragePage {
     addLvmVolumeLink = () => this.page.locator("::-p-text(Add LVM volume group)");
     destructiveActionsList = () => this.page.locator("::-p-text(Check)");
     destructiveActionText = (name) => this.page.locator(`::-p-text(Delete ${name})`);
+    alertFailedCalculateStorageLayout = () => this.page.locator("::-p-text(Failed to calculate a storage layout)");
     constructor(page) {
         this.page = page;
     }
@@ -1554,6 +1695,9 @@ class StoragePage {
             .wait();
         await assert_1.default.deepEqual(elementText, "Encryption is disabled");
     }
+    async verifySpaceAllocationFailed() {
+        assert_1.default.match(await (0, helpers_1.getTextContent)(this.alertFailedCalculateStorageLayout()), /Failed to calculate a storage layout/);
+    }
     async manageDasd() {
         await this.manageDasdLink().click();
     }
@@ -1568,6 +1712,12 @@ class StoragePage {
     }
     async verifyDestructiveAction(action) {
         await this.destructiveActionText(action).wait();
+    }
+    async changeDevice() {
+        await this.changeButton().click();
+    }
+    async selectAnotherDisk() {
+        await this.selectDiskToInstallButton().click();
     }
 }
 exports.StoragePage = StoragePage;
@@ -1692,6 +1842,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const cmdline_1 = __webpack_require__(/*! ./lib/cmdline */ "./src/lib/cmdline.ts");
 const helpers_1 = __webpack_require__(/*! ./lib/helpers */ "./src/lib/helpers.ts");
 const first_user_1 = __webpack_require__(/*! ./checks/first_user */ "./src/checks/first_user.ts");
+const storage_change_device_to_install_1 = __webpack_require__(/*! ./checks/storage_change_device_to_install */ "./src/checks/storage_change_device_to_install.ts");
 const decryption_1 = __webpack_require__(/*! ./checks/decryption */ "./src/checks/decryption.ts");
 const root_authentication_1 = __webpack_require__(/*! ./checks/root_authentication */ "./src/checks/root_authentication.ts");
 const encryption_1 = __webpack_require__(/*! ./checks/encryption */ "./src/checks/encryption.ts");
@@ -1734,6 +1885,7 @@ if (options.registrationCode)
     });
 (0, encryption_1.verifyEncryptionEnabled)();
 (0, encryption_1.disableEncryption)();
+(0, storage_change_device_to_install_1.changeDeviceToInstall)();
 (0, first_user_1.createFirstUser)(options.password);
 (0, root_authentication_1.editRootUser)(options.rootPassword);
 (0, root_authentication_1.verifyPasswordStrength)();

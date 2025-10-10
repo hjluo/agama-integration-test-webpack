@@ -1,9 +1,14 @@
 import assert from "assert";
 import { type Page } from "puppeteer-core";
+import { getTextContent } from "../lib/helpers";
 
 export class StoragePage {
   private readonly page: Page;
   private readonly selectMoreDevicesButton = () => this.page.locator("::-p-text(More devices)");
+
+  private readonly changeButton = () => this.page.locator("::-p-text(Change)");
+  private readonly selectDiskToInstallButton = () =>
+    this.page.locator("::-p-text(Select a disk to install the system)");
 
   private readonly editEncryptionButton = () => this.page.locator("::-p-text(Edit)");
   private readonly encryptionIsEnabledText = () =>
@@ -21,6 +26,9 @@ export class StoragePage {
   private readonly destructiveActionsList = () => this.page.locator("::-p-text(Check)");
   private readonly destructiveActionText = (name: string) =>
     this.page.locator(`::-p-text(Delete ${name})`);
+
+  private readonly alertFailedCalculateStorageLayout = () =>
+    this.page.locator("::-p-text(Failed to calculate a storage layout)");
 
   constructor(page: Page) {
     this.page = page;
@@ -49,6 +57,13 @@ export class StoragePage {
     await assert.deepEqual(elementText, "Encryption is disabled");
   }
 
+  async verifySpaceAllocationFailed() {
+    assert.match(
+      await getTextContent(this.alertFailedCalculateStorageLayout()),
+      /Failed to calculate a storage layout/,
+    );
+  }
+
   async manageDasd() {
     await this.manageDasdLink().click();
   }
@@ -67,5 +82,13 @@ export class StoragePage {
 
   async verifyDestructiveAction(action: string) {
     await this.destructiveActionText(action).wait();
+  }
+
+  async changeDevice() {
+    await this.changeButton().click();
+  }
+
+  async selectAnotherDisk() {
+    await this.selectDiskToInstallButton().click();
   }
 }
