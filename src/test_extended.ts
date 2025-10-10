@@ -2,6 +2,7 @@ import { parse, commaSeparatedList } from "./lib/cmdline";
 import { test_init } from "./lib/helpers";
 
 import { createFirstUser } from "./checks/first_user";
+import { changeDeviceToInstall } from "./checks/storage_change_device_to_install";
 import { decryptDevice } from "./checks/decryption";
 import { editRootUser, verifyPasswordStrength } from "./checks/root_authentication";
 import { enableEncryption, verifyEncryptionEnabled, disableEncryption } from "./checks/encryption";
@@ -58,6 +59,7 @@ disableEncryption();
 createFirstUser(options.password);
 editRootUser(options.rootPassword);
 verifyPasswordStrength();
+changeDeviceToInstall();
 if (options.prepareAdvancedStorage === "zfcp") prepareZfcpStorage();
 downloadLogs();
 if (options.install) {

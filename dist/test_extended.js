@@ -1732,6 +1732,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const cmdline_1 = __webpack_require__(/*! ./lib/cmdline */ "./src/lib/cmdline.ts");
 const helpers_1 = __webpack_require__(/*! ./lib/helpers */ "./src/lib/helpers.ts");
 const first_user_1 = __webpack_require__(/*! ./checks/first_user */ "./src/checks/first_user.ts");
+const storage_change_device_to_install_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module './checks/storage_change_device_to_install'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
 const decryption_1 = __webpack_require__(/*! ./checks/decryption */ "./src/checks/decryption.ts");
 const root_authentication_1 = __webpack_require__(/*! ./checks/root_authentication */ "./src/checks/root_authentication.ts");
 const encryption_1 = __webpack_require__(/*! ./checks/encryption */ "./src/checks/encryption.ts");
@@ -1780,6 +1781,7 @@ if (options.registrationCode)
 (0, first_user_1.createFirstUser)(options.password);
 (0, root_authentication_1.editRootUser)(options.rootPassword);
 (0, root_authentication_1.verifyPasswordStrength)();
+(0, storage_change_device_to_install_1.changeDeviceToInstall)();
 if (options.prepareAdvancedStorage === "zfcp")
     (0, storage_zfcp_1.prepareZfcpStorage)();
 (0, download_logs_1.downloadLogs)();
