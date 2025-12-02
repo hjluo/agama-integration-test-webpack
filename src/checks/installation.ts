@@ -15,6 +15,7 @@ export function performInstallation() {
     await sidebar.goToOverview();
     await overview.install();
     await confirmInstallation.continue();
+    console.log("Installation started....");
   });
 }
 

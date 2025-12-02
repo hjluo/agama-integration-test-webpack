@@ -32,6 +32,7 @@ function performInstallation() {
         await sidebar.goToOverview();
         await overview.install();
         await confirmInstallation.continue();
+        console.log("Installation started....");
     });
 }
 function checkInstallation() {
@@ -228,6 +229,57 @@ function selectPatterns(patterns) {
         for (const pattern of patterns)
             await softwareSelection.selectPattern(pattern);
         await softwareSelection.close();
+    });
+}
+
+
+/***/ }),
+
+/***/ "./src/checks/storage_out_of_sync.ts":
+/*!*******************************************!*\
+  !*** ./src/checks/storage_out_of_sync.ts ***!
+  \*******************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.verifyStorageOutOfSync = verifyStorageOutOfSync;
+const helpers_1 = __webpack_require__(/*! ../lib/helpers */ "./src/lib/helpers.ts");
+const strict_1 = __importDefault(__webpack_require__(/*! node:assert/strict */ "node:assert/strict"));
+const util_1 = __importDefault(__webpack_require__(/*! util */ "util"));
+const child_process_1 = __webpack_require__(/*! child_process */ "child_process");
+const storage_out_of_sync_alert_page_1 = __webpack_require__(/*! ../pages/storage_out_of_sync_alert_page */ "./src/pages/storage_out_of_sync_alert_page.ts");
+// `echo '${config}' | jq '.storage.drives[0].partitions[0].filesystem.type.btrfs.snapshots = false'`,
+async function triggerStorageOutOfSync() {
+    const execPromise = util_1.default.promisify(child_process_1.exec);
+    try {
+        const { stdout: config } = await execPromise("agama config show");
+        const { stdout: modifiedConfig } = await execPromise(`echo '${config}' | jq '.storage.drives[0].partitions[0].filesystem.label = "test-label"'`);
+        await execPromise(`echo '${modifiedConfig}' | agama config load`);
+        console.log("Successfully triggered out of sync alert");
+    }
+    catch (error) {
+        console.error("Error:", error);
+        throw error;
+    }
+}
+function verifyStorageOutOfSync() {
+    (0, helpers_1.it)("should verify storage out of sync popup", async function () {
+        const storageOutOfSyncAlertPage = new storage_out_of_sync_alert_page_1.StorageOutOfSyncAlertPage(helpers_1.page);
+        const execPromise = util_1.default.promisify(child_process_1.exec);
+        const before = await execPromise("agama config show");
+        // await execPromise("agama probe");
+        await triggerStorageOutOfSync();
+        const after = await execPromise("agama config show");
+        console.log("Storage changed:", before !== after);
+        strict_1.default.deepEqual(await (0, helpers_1.getTextContent)(storageOutOfSyncAlertPage.configurationOutOfSyncWarningAlert()), "Configuration out of sync");
+        console.log("verified Configuration out of sync Text, baby");
+        await storageOutOfSyncAlertPage.reloadNow();
+        console.log("999 Verify StorageOutOfSync done, baby");
     });
 }
 
@@ -949,6 +1001,36 @@ exports.SoftwareSelectionPage = SoftwareSelectionPage;
 
 /***/ }),
 
+/***/ "./src/pages/storage_out_of_sync_alert_page.ts":
+/*!*****************************************************!*\
+  !*** ./src/pages/storage_out_of_sync_alert_page.ts ***!
+  \*****************************************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StorageOutOfSyncAlertPage = void 0;
+class StorageOutOfSyncAlertPage {
+    page;
+    configurationOutOfSyncWarningAlert = () => this.page.locator("::-p-text(Configuration out of sync)");
+    reloadNowButton = () => this.page.locator("::-p-text(Reload now)");
+    constructor(page) {
+        this.page = page;
+    }
+    async reloadNow() {
+        console.log("wait 30000 for Selector Reload");
+        await this.page.waitForSelector("::-p-aria(Reload now)", { timeout: 30000 });
+        console.log("Button Reload now is visible");
+        await this.reloadNowButton().click();
+        console.log("888 clicked Reload now button");
+    }
+}
+exports.StorageOutOfSyncAlertPage = StorageOutOfSyncAlertPage;
+
+
+/***/ }),
+
 /***/ "./src/pages/trust_registration_certificate_page.ts":
 /*!**********************************************************!*\
   !*** ./src/pages/trust_registration_certificate_page.ts ***!
@@ -990,6 +1072,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const cmdline_1 = __webpack_require__(/*! ./lib/cmdline */ "./src/lib/cmdline.ts");
 const helpers_1 = __webpack_require__(/*! ./lib/helpers */ "./src/lib/helpers.ts");
 const login_1 = __webpack_require__(/*! ./checks/login */ "./src/checks/login.ts");
+const storage_out_of_sync_1 = __webpack_require__(/*! ./checks/storage_out_of_sync */ "./src/checks/storage_out_of_sync.ts");
 const registration_1 = __webpack_require__(/*! ./checks/registration */ "./src/checks/registration.ts");
 const software_selection_1 = __webpack_require__(/*! ./checks/software_selection */ "./src/checks/software_selection.ts");
 const installation_1 = __webpack_require__(/*! ./checks/installation */ "./src/checks/installation.ts");
@@ -1000,6 +1083,7 @@ const options = (0, cmdline_1.parse)((cmd) => cmd
 (0, login_1.logIn)(options.password);
 (0, registration_1.enterExtensionRegistrationPHub)();
 (0, software_selection_1.selectPatterns)(options.patterns);
+(0, storage_out_of_sync_1.verifyStorageOutOfSync)();
 (0, installation_1.performInstallation)();
 (0, installation_1.finishInstallation)();
 
