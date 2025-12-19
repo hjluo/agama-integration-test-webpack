@@ -738,9 +738,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.page = void 0;
+exports.Desktop = exports.ProductId = exports.page = void 0;
+exports.startBrowser = startBrowser;
+exports.finishBrowser = finishBrowser;
 exports.test_init = test_init;
 exports.setContinueOnError = setContinueOnError;
+exports.dumpPage = dumpPage;
 exports.it = it;
 exports.sleep = sleep;
 exports.getTextContent = getTextContent;
@@ -788,8 +791,6 @@ async function startBrowser(headless, slowMo, agamaBrowser, agamaServer) {
         headless,
         ignoreHTTPSErrors: true,
         timeout: 30000,
-        // This timeout is increased due to DASD format step review in future changes
-        protocolTimeout: 360000,
         slowMo,
         defaultViewport: {
             width: 1280,
@@ -868,8 +869,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
-    // base file name for the dumps
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
     const html = await exports.page.content();
@@ -896,7 +898,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
@@ -908,6 +910,27 @@ function sleep(ms) {
 function getTextContent(locator) {
     return locator.map((element) => element.textContent).wait();
 }
+// for product ids, please check https://github.com/agama-project/agama/tree/master/products.d
+var ProductId;
+(function (ProductId) {
+    ProductId["Leap_16.0"] = "Leap 16.0";
+    ProductId["MicroOS"] = "openSUSE MicroOS";
+    ProductId["SLES_16.0"] = "SUSE Linux Enterprise Server 16.0";
+    ProductId["SLES_SAP_16.0"] = "SUSE Linux Enterprise Server for SAP Applications 16.0";
+    ProductId["Slowroll"] = "Slowroll";
+    ProductId["Tumbleweed"] = "openSUSE Tumbleweed";
+    ProductId["None"] = "none";
+})(ProductId || (exports.ProductId = ProductId = {}));
+;
+var Desktop;
+(function (Desktop) {
+    Desktop["gnome"] = "GNOME Desktop Environment (Wayland)";
+    Desktop["kde"] = "KDE Applications and Plasma Desktop";
+    Desktop["xfce"] = "XFCE Desktop Environment";
+    Desktop["basic"] = "A basic desktop (based on IceWM)";
+    Desktop["none"] = "None";
+})(Desktop || (exports.Desktop = Desktop = {}));
+;
 async function waitOnFile(filePath) {
     const opts = {
         resources: [filePath],
@@ -1627,53 +1650,9 @@ exports.StorageResultPage = StorageResultPage;
 /*!********************************************!*\
   !*** ./src/pages/storage_settings_page.ts ***!
   \********************************************/
-/***/ ((__unused_webpack_module, exports) => {
+/***/ (() => {
 
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.StorageSettingsPage = void 0;
-class StorageSettingsPage {
-    page;
-    selectMoreDevicesButton = () => this.page.locator("::-p-text(More devices)");
-    encryptionTab = () => this.page.locator("::-p-text(Encryption)");
-    changeEncryptionLink = () => this.page.locator('::-p-aria([name="Change"][role="link"])');
-    encryptionIsEnabledText = () => this.page.locator("::-p-text(Encryption is enabled)");
-    encryptionIsDisabledText = () => this.page.locator("::-p-text(Encryption is disabled)");
-    manageDasdLink = () => this.page.locator("::-p-text(Manage DASD devices)");
-    ActivateZfcpLink = () => this.page.locator("::-p-text(Activate zFCP disks)");
-    expandPartitionsButton = () => this.page.locator("::-p-text(New partitions will be created)");
-    optionForRoot = () => this.page.locator("::-p-aria(Options for partition /)");
-    editRootPartitionMenu = () => this.page.locator("::-p-aria(Edit /[role='menuitem'])");
-    constructor(page) {
-        this.page = page;
-    }
-    async selectMoreDevices() {
-        await this.selectMoreDevicesButton().click();
-    }
-    async selectEncryption() {
-        await this.encryptionTab().click();
-    }
-    async changeEncryption() {
-        await this.changeEncryptionLink().click();
-    }
-    async manageDasd() {
-        await this.manageDasdLink().click();
-    }
-    async activateZfcp() {
-        await this.ActivateZfcpLink().click();
-    }
-    async waitForElement(element, timeout) {
-        await this.page.locator(element).setTimeout(timeout).wait();
-    }
-    async editRootPartition() {
-        await this.expandPartitionsButton().click();
-        await this.optionForRoot().click();
-        await this.editRootPartitionMenu().click();
-    }
-}
-exports.StorageSettingsPage = StorageSettingsPage;
-
+throw new Error("Module parse failed: Unexpected token (56:14)\nFile was processed with these loaders:\n * ./node_modules/ts-loader/index.js\nYou may need an additional loader to handle the result of these loaders.\n|         await (0, helpers_1.sleep)(2000);\n|         const logDir = \"/run/agama/scripts\";\n>         const ;\n|         3;\n|         dotButtons = await this.page.$$eval(\".agm-three-dots-icon\", (els) => els.map((el) => el.closest(\"button\").getAttribute(\"aria-label\")));");
 
 /***/ }),
 

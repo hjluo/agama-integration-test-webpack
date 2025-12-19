@@ -192,9 +192,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.page = void 0;
+exports.Desktop = exports.ProductId = exports.page = void 0;
+exports.startBrowser = startBrowser;
+exports.finishBrowser = finishBrowser;
 exports.test_init = test_init;
 exports.setContinueOnError = setContinueOnError;
+exports.dumpPage = dumpPage;
 exports.it = it;
 exports.sleep = sleep;
 exports.getTextContent = getTextContent;
@@ -242,8 +245,6 @@ async function startBrowser(headless, slowMo, agamaBrowser, agamaServer) {
         headless,
         ignoreHTTPSErrors: true,
         timeout: 30000,
-        // This timeout is increased due to DASD format step review in future changes
-        protocolTimeout: 360000,
         slowMo,
         defaultViewport: {
             width: 1280,
@@ -322,8 +323,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
-    // base file name for the dumps
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
     const html = await exports.page.content();
@@ -350,7 +352,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
@@ -362,6 +364,27 @@ function sleep(ms) {
 function getTextContent(locator) {
     return locator.map((element) => element.textContent).wait();
 }
+// for product ids, please check https://github.com/agama-project/agama/tree/master/products.d
+var ProductId;
+(function (ProductId) {
+    ProductId["Leap_16.0"] = "Leap 16.0";
+    ProductId["MicroOS"] = "openSUSE MicroOS";
+    ProductId["SLES_16.0"] = "SUSE Linux Enterprise Server 16.0";
+    ProductId["SLES_SAP_16.0"] = "SUSE Linux Enterprise Server for SAP Applications 16.0";
+    ProductId["Slowroll"] = "Slowroll";
+    ProductId["Tumbleweed"] = "openSUSE Tumbleweed";
+    ProductId["None"] = "none";
+})(ProductId || (exports.ProductId = ProductId = {}));
+;
+var Desktop;
+(function (Desktop) {
+    Desktop["gnome"] = "GNOME Desktop Environment (Wayland)";
+    Desktop["kde"] = "KDE Applications and Plasma Desktop";
+    Desktop["xfce"] = "XFCE Desktop Environment";
+    Desktop["basic"] = "A basic desktop (based on IceWM)";
+    Desktop["none"] = "None";
+})(Desktop || (exports.Desktop = Desktop = {}));
+;
 async function waitOnFile(filePath) {
     const opts = {
         resources: [filePath],
