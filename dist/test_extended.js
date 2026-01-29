@@ -1802,9 +1802,11 @@ class ExtensionRegistrationPHubPage {
     }
     async register() {
         await this.registerButton().click();
+        console.log("clicked phub registerButton");
     }
     async trustKey() {
         await this.trustKeyButton().click();
+        console.log("clicked trustKeyButton");
     }
 }
 exports.ExtensionRegistrationPHubPage = ExtensionRegistrationPHubPage;
