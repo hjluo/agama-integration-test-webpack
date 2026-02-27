@@ -1,5 +1,5 @@
-import { it, page, getTextContent } from "../lib/helpers";
-import { OverviewWithRegistrationPage } from "../pages/overview_page";
+import { it, page, getTextContent, dumpPage } from "../lib/helpers";
+import { OverviewPage, OverviewWithRegistrationPage } from "../pages/overview_page";
 import {
   ProductRegistrationPage,
   CustomRegistrationPage,
@@ -72,7 +72,17 @@ export function enterProductRegistration({
     const productRegistration = new ProductRegistrationPage(page);
 
     await productRegistration.verifyCustomRegistration();
+    console.log("RMT successfully registered");
+
     await header.goToOverview();
+    console.log("take a screenshot for the overview page");
+    const logDir = "/run/agama/scripts";
+    await dumpPage(logDir, "rmt_registration_overview");
+
+    console.log("take a screenshot for the software page");
+    const overview = new OverviewPage(page);
+    await overview.goToSoftware();
+    await dumpPage(logDir, "rmt_software_page");
   });
 }
 

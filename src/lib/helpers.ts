@@ -151,7 +151,8 @@ async function dumpCSS() {
 }
 
 // dump the current page displayed in puppeteer
-async function dumpPage(label: string) {
+export async function dumpPage(dir: string, label: string) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
   // base file name for the dumps
   const name = path.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
   await page.screenshot({ path: name + ".png" });
@@ -177,7 +178,7 @@ export async function it(label: string, test: () => Promise<void>, timeout?: num
           // dump the current page
           if (!fs.existsSync(dir)) fs.mkdirSync(dir);
           // dump the page and the CSS in parallel
-          await Promise.allSettled([dumpPage(label), dumpCSS()]);
+          await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
         }
         throw new Error("Test failed!", { cause: error });
       }

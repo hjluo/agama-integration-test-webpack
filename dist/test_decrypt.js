@@ -558,7 +558,15 @@ function enterProductRegistration({ use_custom, code, provide_code, url, }) {
         const header = new header_page_1.HeaderPage(helpers_1.page);
         const productRegistration = new product_registration_page_1.ProductRegistrationPage(helpers_1.page);
         await productRegistration.verifyCustomRegistration();
+        console.log("RMT successfully registered");
         await header.goToOverview();
+        console.log("take a screenshot for the overview page");
+        const logDir = "/run/agama/scripts";
+        await (0, helpers_1.dumpPage)(logDir, "rmt_registration_overview");
+        console.log("take a screenshot for the software page");
+        const overview = new overview_page_1.OverviewPage(helpers_1.page);
+        await overview.goToSoftware();
+        await (0, helpers_1.dumpPage)(logDir, "rmt_software_page");
     });
 }
 function enterProductRegistrationWithSidebar({ use_custom, code, provide_code, url, }) {
@@ -844,7 +852,17 @@ function selectPatterns(patterns) {
         for (const pattern of patterns)
             await softwareSelection.selectPattern(pattern);
         await softwareSelection.close();
+        console.log("selected gnome pattern");
+        const logDir = "/run/agama/scripts";
+        await (0, helpers_1.sleep)(3000);
         header.goToOverview();
+        console.log("1 take a screenshot for the overview page");
+        await (0, helpers_1.dumpPage)(logDir, "screenshot_after_select_gnome");
+        await overview.goToStorage();
+        await (0, helpers_1.dumpPage)(logDir, "screenshot_in_storage");
+        console.log("2 take a screenshot for the storage page");
+        header.goToOverview();
+        console.log("2 back to the overview page");
     });
 }
 function selectPatternsWithSidebar(patterns) {
@@ -1312,6 +1330,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.page = void 0;
 exports.test_init = test_init;
 exports.setContinueOnError = setContinueOnError;
+exports.dumpPage = dumpPage;
 exports.it = it;
 exports.sleep = sleep;
 exports.getTextContent = getTextContent;
@@ -1440,7 +1459,9 @@ async function dumpCSS() {
     });
 }
 // dump the current page displayed in puppeteer
-async function dumpPage(label) {
+async function dumpPage(dir, label) {
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir);
     // base file name for the dumps
     const name = path_1.default.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
     await exports.page.screenshot({ path: name + ".png" });
@@ -1468,7 +1489,7 @@ async function it(label, test, timeout) {
                 if (!fs_1.default.existsSync(dir))
                     fs_1.default.mkdirSync(dir);
                 // dump the page and the CSS in parallel
-                await Promise.allSettled([dumpPage(label), dumpCSS()]);
+                await Promise.allSettled([dumpPage(dir, label), dumpCSS()]);
             }
             throw new Error("Test failed!", { cause: error });
         }
