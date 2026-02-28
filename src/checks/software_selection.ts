@@ -1,4 +1,4 @@
-import { it, page } from "../lib/helpers";
+import { it, page, sleep } from "../lib/helpers";
 import { HeaderPage } from "../pages/header_page";
 import { OverviewPage } from "../pages/overview_page";
 import { SidebarPage } from "../pages/sidebar_page";
@@ -17,6 +17,7 @@ export function selectPatterns(patterns: string[]) {
 
     for (const pattern of patterns) await softwareSelection.selectPattern(pattern);
     await softwareSelection.close();
+    await sleep(3000);
     header.goToOverview();
   });
 }

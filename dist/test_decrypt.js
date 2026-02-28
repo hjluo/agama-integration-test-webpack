@@ -844,6 +844,7 @@ function selectPatterns(patterns) {
         for (const pattern of patterns)
             await softwareSelection.selectPattern(pattern);
         await softwareSelection.close();
+        await (0, helpers_1.sleep)(3000);
         header.goToOverview();
     });
 }
