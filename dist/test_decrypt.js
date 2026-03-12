@@ -2575,13 +2575,19 @@ class SoftwareSelectionPage {
         this.page = page;
     }
     async selectPattern(pattern) {
+        console.log(`>>>Processing pattern: ${pattern}`);
         const checkbox = await this.patternCheckboxNotChecked(pattern).waitHandle();
         await checkbox.scrollIntoView();
         await this.patternCheckboxNotChecked(pattern).click();
+        await this.page.waitForSelector(".agm-main-content-overlay", { hidden: true });
         await this.patternCheckboxChecked(pattern).wait();
+        console.log(`====>Done for pattern: ${pattern}`);
     }
     async close() {
+        console.log("now click close button");
+        await this.closeButton().setTimeout(10000).wait();
         await this.closeButton().click();
+        console.log("==888 clicked closeButton");
     }
 }
 exports.SoftwareSelectionPage = SoftwareSelectionPage;
