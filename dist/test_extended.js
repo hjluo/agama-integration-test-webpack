@@ -1223,7 +1223,7 @@ const storage_settings_page_1 = __webpack_require__(/*! ../pages/storage_setting
 const storage_zfcp_activate_controllers_page_1 = __webpack_require__(/*! ../pages/storage_zfcp_activate_controllers_page */ "./src/pages/storage_zfcp_activate_controllers_page.ts");
 const zfcp_page_1 = __webpack_require__(/*! ../pages/zfcp_page */ "./src/pages/zfcp_page.ts");
 const activate_controllers_page_1 = __webpack_require__(/*! ../pages/activate_controllers_page */ "./src/pages/activate_controllers_page.ts");
-const activate_multipath_page_1 = __webpack_require__(/*! ../pages/activate_multipath_page */ "./src/pages/activate_multipath_page.ts");
+const storage_activate_multipath_page_1 = __webpack_require__(/*! ../pages/storage_activate_multipath_page */ "./src/pages/storage_activate_multipath_page.ts");
 function prepareZfcpStorage() {
     (0, helpers_1.it)("should prepare zFCP storage", async function () {
         const storageNoDeviceFound = new storage_settings_page_1.StorageSettingsPage(helpers_1.page);
@@ -1231,13 +1231,13 @@ function prepareZfcpStorage() {
         const storageZfcpActivateControllers = new storage_zfcp_activate_controllers_page_1.StorageZfcpActivateControllersPage(helpers_1.page);
         const header = new header_page_1.HeaderPage(helpers_1.page);
         const overview = new overview_page_1.OverviewPage(helpers_1.page);
-        const multipath = new activate_multipath_page_1.ActivateMultipathPage(helpers_1.page);
+        const storageActivateMultipath = new storage_activate_multipath_page_1.StorageActivateMultipathPage(helpers_1.page);
         await overview.goToStorage();
         await storageNoDeviceFound.activateZfcpDisks();
         await storageZfcpControllersNotActivated.activateControllers();
         await storageZfcpActivateControllers.select(["0.0.fa00", "0.0.fc00"]);
-        await (0, helpers_1.waitUntilOverlaySettled)(() => storageZfcpActivateControllers.accept());
-        await multipath.activate();
+        await (0, helpers_1.waitUntilOverlaySettled)(() => storageZfcpActivateControllers.accept(), true);
+        await (0, helpers_1.waitUntilOverlaySettled)(() => storageActivateMultipath.yes());
         await header.goToInstallation();
     });
 }
@@ -1592,7 +1592,7 @@ function getTextContent(locator, timeout = 30000) {
 function getValue(locator) {
     return locator.map((element) => element.value).wait();
 }
-async function waitUntilOverlaySettled(action) {
+async function waitUntilOverlaySettled(action, expectQuestionInterruption = false) {
     const selector = '[role="alert"].agm-main-content-overlay';
     const start = Date.now();
     // Start watching for overlay BEFORE executing the action
@@ -1605,11 +1605,14 @@ async function waitUntilOverlaySettled(action) {
     await action();
     // Wait for the overlay we started watching for
     const appeared = await appearancePromise;
-    if (appeared) {
+    if (appeared && !expectQuestionInterruption) {
         debugLog("Overlay detected. Waiting for it to disappear...");
         await exports.page.waitForSelector(selector, { hidden: true });
         const duration = Date.now() - start;
         debugLog(`Overlay cleared after ${duration}ms`);
+    }
+    else if (appeared && expectQuestionInterruption) {
+        debugLog("Overlay expected and not waiting for it to disappear.");
     }
 }
 async function waitOnFile(filePath) {
@@ -1793,31 +1796,6 @@ class ActivateControllersPage {
     }
 }
 exports.ActivateControllersPage = ActivateControllersPage;
-
-
-/***/ },
-
-/***/ "./src/pages/activate_multipath_page.ts"
-/*!**********************************************!*\
-  !*** ./src/pages/activate_multipath_page.ts ***!
-  \**********************************************/
-(__unused_webpack_module, exports) {
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ActivateMultipathPage = void 0;
-class ActivateMultipathPage {
-    page;
-    multipathText = () => this.page.locator("::-p-text(The system seems to have multipath hardware)");
-    activateButton = () => this.page.locator("::-p-text(Yes)");
-    constructor(page) {
-        this.page = page;
-    }
-    async activate() {
-        await this.activateButton().click();
-    }
-}
-exports.ActivateMultipathPage = ActivateMultipathPage;
 
 
 /***/ },
@@ -2536,7 +2514,7 @@ class OverviewPage {
         await this.overviewHeading().setTimeout(timeout).wait();
     }
     async install() {
-        await this.installButton().setTimeout(60000).click();
+        await this.installButton().click();
     }
     async goToSystem() {
         await this.systemLink().click();
@@ -3113,6 +3091,31 @@ class SoftwarePatternsSelectionPage {
     }
 }
 exports.SoftwarePatternsSelectionPage = SoftwarePatternsSelectionPage;
+
+
+/***/ },
+
+/***/ "./src/pages/storage_activate_multipath_page.ts"
+/*!******************************************************!*\
+  !*** ./src/pages/storage_activate_multipath_page.ts ***!
+  \******************************************************/
+(__unused_webpack_module, exports) {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StorageActivateMultipathPage = void 0;
+class StorageActivateMultipathPage {
+    page;
+    multipathText = () => this.page.locator("::-p-text(The system seems to have multipath hardware)");
+    yesButton = () => this.page.locator('div[role="dialog"][aria-label="Question"] button::-p-text(Yes)');
+    constructor(page) {
+        this.page = page;
+    }
+    async yes() {
+        await this.yesButton().click();
+    }
+}
+exports.StorageActivateMultipathPage = StorageActivateMultipathPage;
 
 
 /***/ },

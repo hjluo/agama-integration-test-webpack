@@ -416,7 +416,7 @@ function getTextContent(locator, timeout = 30000) {
 function getValue(locator) {
     return locator.map((element) => element.value).wait();
 }
-async function waitUntilOverlaySettled(action) {
+async function waitUntilOverlaySettled(action, expectQuestionInterruption = false) {
     const selector = '[role="alert"].agm-main-content-overlay';
     const start = Date.now();
     // Start watching for overlay BEFORE executing the action
@@ -429,11 +429,14 @@ async function waitUntilOverlaySettled(action) {
     await action();
     // Wait for the overlay we started watching for
     const appeared = await appearancePromise;
-    if (appeared) {
+    if (appeared && !expectQuestionInterruption) {
         debugLog("Overlay detected. Waiting for it to disappear...");
         await exports.page.waitForSelector(selector, { hidden: true });
         const duration = Date.now() - start;
         debugLog(`Overlay cleared after ${duration}ms`);
+    }
+    else if (appeared && expectQuestionInterruption) {
+        debugLog("Overlay expected and not waiting for it to disappear.");
     }
 }
 async function waitOnFile(filePath) {

@@ -218,7 +218,10 @@ export function getValue(locator): Promise<string> {
   return locator.map((element) => element.value).wait();
 }
 
-export async function waitUntilOverlaySettled(action: () => Promise<void>) {
+export async function waitUntilOverlaySettled(
+  action: () => Promise<void>,
+  expectQuestionInterruption = false
+) {
   const selector = '[role="alert"].agm-main-content-overlay';
 
   const start = Date.now();
@@ -236,13 +239,14 @@ export async function waitUntilOverlaySettled(action: () => Promise<void>) {
   // Wait for the overlay we started watching for
   const appeared = await appearancePromise;
 
-  if (appeared) {
+  if (appeared && !expectQuestionInterruption) {
     debugLog("Overlay detected. Waiting for it to disappear...");
-
     await page.waitForSelector(selector, { hidden: true });
 
     const duration = Date.now() - start;
     debugLog(`Overlay cleared after ${duration}ms`);
+  } else if (appeared && expectQuestionInterruption) {
+    debugLog("Overlay expected and not waiting for it to disappear.");
   }
 }
 

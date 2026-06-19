@@ -6,7 +6,7 @@ import { StorageSettingsPage as StorageNoDevicesFound } from "../pages/storage_s
 import { StorageZfcpActivateControllersPage } from "../pages/storage_zfcp_activate_controllers_page";
 import { ZfcpPage } from "../pages/zfcp_page";
 import { ActivateControllersPage as StorageZfcpControllersNotActivatedPage } from "../pages/activate_controllers_page";
-import { ActivateMultipathPage } from "../pages/activate_multipath_page";
+import { StorageActivateMultipathPage } from "../pages/storage_activate_multipath_page";
 
 export function prepareZfcpStorage() {
   it("should prepare zFCP storage", async function () {
@@ -15,15 +15,14 @@ export function prepareZfcpStorage() {
     const storageZfcpActivateControllers = new StorageZfcpActivateControllersPage(page);
     const header = new HeaderPage(page);
     const overview = new OverviewPage(page);
-    const multipath = new ActivateMultipathPage(page);
+    const storageActivateMultipath = new StorageActivateMultipathPage(page);
 
     await overview.goToStorage();
     await storageNoDeviceFound.activateZfcpDisks();
     await storageZfcpControllersNotActivated.activateControllers();
     await storageZfcpActivateControllers.select(["0.0.fa00", "0.0.fc00"]);
-    await waitUntilOverlaySettled(() => storageZfcpActivateControllers.accept());
-
-    await multipath.activate();
+    await waitUntilOverlaySettled(() => storageZfcpActivateControllers.accept(), true);
+    await waitUntilOverlaySettled(() => storageActivateMultipath.yes());
     await header.goToInstallation();
   });
 }
