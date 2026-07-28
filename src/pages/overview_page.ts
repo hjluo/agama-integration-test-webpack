@@ -25,6 +25,7 @@ export class OverviewPage {
 
   async install() {
     await this.installButton().click();
+    console.log(">>> Now click Install now button to install");
   }
 
   async goToSystem() {

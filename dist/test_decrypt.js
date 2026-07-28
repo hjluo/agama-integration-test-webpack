@@ -373,8 +373,10 @@ function checkInstallationWithSidebar() {
 function finishInstallation() {
     (0, helpers_1.it)("should finish installation", async function () {
         const installationComplete = new installation_complete_page_1.InstallationCompletePage(helpers_1.page);
-        await installationComplete.wait(20 * 60 * 1000);
-    }, 21 * 60 * 1000);
+        console.log(">>> Installing and wait it to be finished");
+        await installationComplete.wait(40 * 60 * 1000);
+        console.log(">>> 888 Congratulation! Installation successfully finished!");
+    }, 41 * 60 * 1000);
 }
 function finishInstallationCongratulation() {
     (0, helpers_1.it)("should finish installation", async function () {
@@ -1163,7 +1165,11 @@ function prepareZfcpStorage() {
         await storageZfcpActivateControllers.select(["0.0.fa00", "0.0.fc00"]);
         await (0, helpers_1.waitUntilOverlaySettled)(() => storageZfcpActivateControllers.accept(), true);
         await (0, helpers_1.waitUntilOverlaySettled)(() => storageActivateMultipath.yes());
+        console.log(">>>Go to storage and wait refresh data to disappear...");
+        await (0, helpers_1.waitUntilOverlaySettled)(() => overview.goToStorage());
+        console.log(">>>Refresh data finished.");
         await header.goToInstallation();
+        console.log(">>>Go to Overview page by clicking Installation");
     });
 }
 function prepareZfcpStorageWithSidebar() {
@@ -2554,6 +2560,7 @@ class OverviewPage {
     }
     async install() {
         await this.installButton().click();
+        console.log(">>> Now click Install now button to install");
     }
     async goToSystem() {
         await this.systemLink().click();

@@ -23,7 +23,11 @@ export function prepareZfcpStorage() {
     await storageZfcpActivateControllers.select(["0.0.fa00", "0.0.fc00"]);
     await waitUntilOverlaySettled(() => storageZfcpActivateControllers.accept(), true);
     await waitUntilOverlaySettled(() => storageActivateMultipath.yes());
+    console.log(">>>Go to storage and wait refresh data to disappear...");
+    await waitUntilOverlaySettled(() => overview.goToStorage());
+    console.log(">>>Refresh data finished.");
     await header.goToInstallation();
+    console.log(">>>Go to Overview page by clicking Installation");
   });
 }
 

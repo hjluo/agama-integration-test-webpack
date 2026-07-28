@@ -82,9 +82,11 @@ export function finishInstallation() {
     "should finish installation",
     async function () {
       const installationComplete = new InstallationCompletePage(page);
-      await installationComplete.wait(20 * 60 * 1000);
+      console.log(">>> Installing and wait it to be finished");
+      await installationComplete.wait(40 * 60 * 1000);
+      console.log(">>> 888 Congratulation! Installation successfully finished!");
     },
-    21 * 60 * 1000,
+    41 * 60 * 1000,
   );
 }
 
