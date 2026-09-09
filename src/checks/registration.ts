@@ -181,6 +181,7 @@ export function enterProductRegistrationWithSidebar({
         await customRegistration.fillServerUrl(url);
       }
       if (provide_code) {
+        console.log("provide_code");
         await productRegistration.checkProvideRegistrationCode();
         await productRegistration.fillCode(code);
       }

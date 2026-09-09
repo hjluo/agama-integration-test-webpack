@@ -1,5 +1,5 @@
 import { type Page } from "puppeteer-core";
-import { type GConstructor } from "../lib/helpers";
+import { type GConstructor, dumpPage } from "../lib/helpers";
 
 class RegistrationBasePage {
   page: Page;
@@ -61,7 +61,11 @@ function CustomSelectable<TBase extends GConstructor<RegistrationBasePage>>(Base
       this.page.locator("::-p-aria(Custom Register using a custom registration server)");
 
     async fillCode(code: string) {
+      console.log("enter fillCode...");
+      const logDir = "/run/agama/scripts";
+      await dumpPage(logDir, "codeInput_before");
       await this.codeInput().fill(code);
+      await dumpPage(logDir, "codeInput_after");
     }
 
     async selectCustomRegistrationServer() {

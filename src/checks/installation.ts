@@ -1,4 +1,4 @@
-import { it, page, getTextContent } from "../lib/helpers";
+import { it, page, getTextContent, dumpPage } from "../lib/helpers";
 import { ConfirmInstallationPage } from "../pages/confirm_installation_page";
 import { CongratulationPage } from "../pages/congratulation_page";
 import { OverviewPage } from "../pages/overview_page";
@@ -15,7 +15,10 @@ export function performInstallation() {
     const confirmInstallation = new ConfirmInstallationPage(page);
     const overview = new OverviewPage(page);
 
+    const logDir = "/run/agama/scripts";
+    await dumpPage(logDir, "dump_Overview");
     await overview.install();
+    await dumpPage(logDir, "dump_install");
     await confirmInstallation.confirmAndInstall();
   });
 }
