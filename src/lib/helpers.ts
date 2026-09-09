@@ -27,9 +27,9 @@ const dir = "log";
  * @param message - The debug message to log
  */
 function debugLog(message: string): void {
-  if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
-    console.log(`[Debug]: ${message}`);
-  }
+  // if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
+  console.log(`[Debug]: ${message}`);
+  // }
 }
 
 interface BrowserSettings {
@@ -171,7 +171,8 @@ async function dumpCSS() {
 
 // dump the current page displayed in puppeteer
 // ts-prune-ignore-next
-export async function dumpPage(label: string) {
+export async function dumpPage(label: string, dir: string = "/run/agama/scripts") {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
   // base file name for the dumps
   const name = path.join(dir, label.replace(/[^a-zA-Z0-9]/g, "_"));
   await page.screenshot({ path: name + ".png" });
@@ -195,7 +196,7 @@ export async function it(label: string, test: () => Promise<void>, timeout?: num
         if (!continueOnError) failed = true;
         if (page) {
           // dump the page and the CSS in parallel
-          await Promise.allSettled([dumpPage(label), dumpCSS()]);
+          await Promise.allSettled([dumpPage(label, dir), dumpCSS()]);
         }
         throw new Error("Test failed!", { cause: error });
       }
@@ -220,7 +221,8 @@ export function getValue(locator): Promise<string> {
 
 export async function waitUntilOverlaySettled(
   action: () => Promise<void>,
-  expectQuestionInterruption = false
+  expectQuestionInterruption = false,
+  disappearanceTimeout = 2 * 60 * 1000
 ) {
   const selector = '[role="alert"].agm-main-content-overlay';
 
@@ -241,7 +243,7 @@ export async function waitUntilOverlaySettled(
 
   if (appeared && !expectQuestionInterruption) {
     debugLog("Overlay detected. Waiting for it to disappear...");
-    await page.waitForSelector(selector, { hidden: true });
+    await page.waitForSelector(selector, { hidden: true, timeout: disappearanceTimeout });
 
     const duration = Date.now() - start;
     debugLog(`Overlay cleared after ${duration}ms`);

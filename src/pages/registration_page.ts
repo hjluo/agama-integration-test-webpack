@@ -1,5 +1,5 @@
 import { type Page } from "puppeteer-core";
-import { type GConstructor } from "../lib/helpers";
+import { type GConstructor, dumpPage } from "../lib/helpers";
 
 class RegistrationBasePage {
   page: Page;
@@ -27,6 +27,7 @@ class RegistrationBasePage {
 
   async register() {
     await this.registerButton().click();
+    await dumpPage("555_after_click_register");
   }
 }
 

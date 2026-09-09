@@ -1,4 +1,4 @@
-import { getTextContent, it, page, waitUntilOverlaySettled } from "../lib/helpers";
+import { getTextContent, it, page, waitUntilOverlaySettled, dumpPage } from "../lib/helpers";
 import { HeaderPage } from "../pages/header_page";
 import { OverviewPage } from "../pages/overview_page";
 import { SidebarPage } from "../pages/sidebar_page";
@@ -60,7 +60,11 @@ export function verifySoftwareSelectionNotAvailable(): void {
     const software = new SoftwareSelectionIsNotAvailablePage(page);
     const header = new HeaderPage(page);
 
+    console.log("==>dump_ensureLandingOnOverview");
+    await dumpPage("dump_before_goToSoftware");
     await overview.goToSoftware();
+    await dumpPage("dump_after_goToSoftware");
+
     const softwareSelectionNotAvailableText = await getTextContent(
       software.softwareSelectionNotAvailableText(),
     );

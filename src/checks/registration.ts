@@ -1,4 +1,4 @@
-import { it, page, getTextContent } from "../lib/helpers";
+import { it, page, getTextContent, dumpPage, waitUntilOverlaySettled } from "../lib/helpers";
 import { OverviewPage } from "../pages/overview_page";
 import { RegistrationSCCPage, RegistrationCustomPage } from "../pages/registration_page";
 import { ExtensionRegistrationPHubPage } from "../pages/extension_registration_phub_page";
@@ -29,27 +29,36 @@ export function enterProductRegistration({
   provide_code,
   url,
 }: RegistrationOptions): void {
-  it("should allow setting registration", async function () {
-    const overview = new OverviewPage(page);
-    let productRegistration: RegistrationCustomPage | RegistrationSCCPage;
+  it(
+    "should allow setting registration",
+    async function () {
+      const overview = new OverviewPage(page);
+      let productRegistration: RegistrationCustomPage | RegistrationSCCPage;
 
-    await overview.goToRegistration();
+      await overview.goToRegistration();
 
-    if (use_custom) {
-      productRegistration = new RegistrationCustomPage(page);
-      if (url) {
-        await productRegistration.selectCustomRegistrationServer();
-        await productRegistration.fillServerUrl(url);
-      }
-      if (provide_code) {
+      if (use_custom) {
+        productRegistration = new RegistrationCustomPage(page);
+        if (url) {
+          await productRegistration.selectCustomRegistrationServer();
+          await dumpPage("dump_before_fill_url");
+          await productRegistration.fillServerUrl(url);
+          await dumpPage("dump_after");
+        }
+        if (provide_code) {
+          await dumpPage("dump_before_fill_code");
+          await productRegistration.fillCode(code);
+        }
+      } else {
+        productRegistration = new RegistrationSCCPage(page);
         await productRegistration.fillCode(code);
       }
-    } else {
-      productRegistration = new RegistrationSCCPage(page);
-      await productRegistration.fillCode(code);
-    }
-    await productRegistration.register();
-  });
+      await dumpPage("dump_before_click_register");
+      await waitUntilOverlaySettled(() => productRegistration.register());
+      console.log(">>>registration done");
+    },
+    3 * 60 * 1000,
+  );
 
   if (url?.startsWith("https")) {
     it("should handle HTTPS certificate trust for custom registration server", async function () {
