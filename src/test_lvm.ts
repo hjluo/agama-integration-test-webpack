@@ -34,9 +34,11 @@ const testStrategy = ProductStrategyFactory.create(
 
 logIn(options.password);
 if (options.prepareAdvancedStorage === "dasd") testStrategy.prepareDasdStorage();
+console.log("prepareDasdStorage done.");
 testStrategy.configureVolumeGroup(options.lvmAdditionalDisks);
 if (options.connectionsOnlyForInstallation) testStrategy.setOnlyInstallationNetwork();
 if (options.install) {
+  console.log("now perf installation ...");
   testStrategy.performInstallation();
   testStrategy.finishInstallation();
 }

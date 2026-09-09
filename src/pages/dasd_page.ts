@@ -1,4 +1,5 @@
 import { type Page } from "puppeteer-core";
+import { dumpPage } from "../lib/helpers";
 
 export class DasdPage {
   private readonly page: Page;
@@ -15,6 +16,8 @@ export class DasdPage {
       .filter((item) => item.getAttribute("tabindex") === "0");
 
   private readonly formatDiskButton = () => this.page.locator("::-p-aria(Format[role='button'])");
+  // private readonly formatDiskButton = () => this.page.locator('::-p-aria(button[name="Format"])');
+
   private readonly formatNowDiskButton = () => this.page.locator("::-p-text(Format now)");
 
   constructor(page: Page) {
@@ -31,10 +34,16 @@ export class DasdPage {
 
   async selectDeviceToFormat() {
     await this.selectRow(0).click();
+    console.log("dasd format start...");
     await this.formatDiskButton().click();
+    const logDir = "/run/agama/scripts";
+    await dumpPage(logDir, "dump_FormatButton");
   }
 
   async formatNowDevice() {
+    console.log("dasd format Now start...");
     await this.formatNowDiskButton().click();
+    const logDir = "/run/agama/scripts";
+    await dumpPage(logDir, "dump_formatNow");
   }
 }
