@@ -18,6 +18,9 @@ export async function downloadLogs() {
     const exactFilePath = path.join(downloadFolder, downloadedFiles[0]);
     const fileSize = fs.statSync(exactFilePath).size;
     assert(fileSize > 0, "Agama Logfile is empty.");
+    console.log("wait DownloadSuccessAlert to disappear...");
+    await optionsPage.waitForSuccessAlertToDisappear();
+    console.log("DownloadSuccessAlert disappeared");
   });
 }
 

@@ -67,6 +67,7 @@ testStrategy.createFirstUser(options.password);
 testStrategy.editRootUser(options.rootPassword);
 if (options.prepareAdvancedStorage === "zfcp") testStrategy.prepareZfcpStorage();
 testStrategy.downloadLogs();
+testStrategy.downloadConfiguration();
 if (options.install) {
   testStrategy.performInstallation();
   testStrategy.checkInstallation();
