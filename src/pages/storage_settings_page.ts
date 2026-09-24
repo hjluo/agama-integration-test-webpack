@@ -64,6 +64,14 @@ export class StorageSettingsPage {
   private readonly addDeviceMenuitem = () =>
     this.page.locator("::-p-aria(Add device menu[role='menuitem'])");
 
+  private readonly moreStorageOptionsToggle = () =>
+    this.page.locator('::-p-aria(button[name="More storage options"])');
+
+  private readonly rescanDevicesMenuItem = () =>
+    this.page.locator(
+      '::-p-aria(menuitem[name="Rescan devices Update available disks and activate crypt devices"])',
+    );
+
   constructor(page: Page) {
     this.page = page;
   }
@@ -158,5 +166,13 @@ export class StorageSettingsPage {
 
   async changeBootOptions() {
     await this.changeBootOptionsButton().click();
+  }
+
+  async moreStorageOptions() {
+    await this.moreStorageOptionsToggle().click();
+  }
+
+  async rescanDevices() {
+    await this.rescanDevicesMenuItem().click();
   }
 }

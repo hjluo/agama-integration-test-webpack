@@ -1,4 +1,4 @@
-import { it, page, getTextContent } from "../lib/helpers";
+import { it, page, getTextContent, dumpPage } from "../lib/helpers";
 import { ConfirmInstallationPage } from "../pages/confirm_installation_page";
 import { CongratulationPage } from "../pages/congratulation_page";
 import { OverviewPage } from "../pages/overview_page";
@@ -15,8 +15,11 @@ export function performInstallation() {
     const confirmInstallation = new ConfirmInstallationPage(page);
     const overview = new OverviewPage(page);
 
+    await dumpPage("dump_Overview");
     await overview.install();
+    await dumpPage("dump_install");
     await confirmInstallation.confirmAndInstall();
+    console.log("Now perform installation, please wait babe ...");
   });
 }
 
