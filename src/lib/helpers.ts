@@ -27,9 +27,9 @@ const dir = "log";
  * @param message - The debug message to log
  */
 function debugLog(message: string): void {
-  if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
-    console.log(`[Debug]: ${message}`);
-  }
+  // if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
+  console.log(`[Debug]: ${message}`);
+  // }
 }
 
 interface BrowserSettings {
@@ -248,6 +248,36 @@ export async function waitUntilOverlaySettled(
   } else if (appeared && expectQuestionInterruption) {
     debugLog("Overlay expected and not waiting for it to disappear.");
   }
+}
+
+export async function waitUntilSystemAndOverlaySettled(
+  action?: () => void | Promise<void>,
+  disappearanceTimeout = 3 * 60 * 1000
+) {
+  const idleButtonSelector = 'button[aria-label="Status: Idle"]';
+  const overlaySelector = '[role="alert"].agm-main-content-overlay';
+  const start = Date.now();
+
+  if (action) {
+    await action();
+  }
+
+  debugLog("Waiting for BOTH top-bar Idle state AND overlay disappearance...");
+
+  await Promise.all([
+    page.waitForSelector(idleButtonSelector, {
+      visible: true,
+      timeout: disappearanceTimeout,
+    }),
+
+    page.waitForSelector(overlaySelector, {
+      hidden: true,
+      timeout: disappearanceTimeout,
+    }),
+  ]);
+
+  const duration = Date.now() - start;
+  debugLog(`System is Idle AND UI overlays are cleared after ${duration}ms`);
 }
 
 // eslint-disable-next-line
