@@ -27,9 +27,9 @@ const dir = "log";
  * @param message - The debug message to log
  */
 function debugLog(message: string): void {
-  if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
-    console.log(`[Debug]: ${message}`);
-  }
+  // if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
+  console.log(`[Debug]: ${message}`);
+  // }
 }
 
 interface BrowserSettings {
@@ -247,6 +247,41 @@ export async function waitUntilOverlaySettled(
     debugLog(`Overlay cleared after ${duration}ms`);
   } else if (appeared && expectQuestionInterruption) {
     debugLog("Overlay expected and not waiting for it to disappear.");
+  }
+}
+
+export async function waitUntilSystemToIdle(
+  action?: () => void | Promise<void>,
+  disappearanceTimeout = 60 * 1000
+) {
+  const idleButtonSelector = 'button[aria-label="Status: Idle"]';
+  const busyButtonSelector =
+    'button.pf-m-in-progress, button[aria-label]:not([aria-label="Status: Idle"])';
+
+  const start = Date.now();
+
+  const busyPromise = page
+    .waitForSelector(busyButtonSelector, { visible: true, timeout: 3000 })
+    .catch(() => {
+      debugLog("No pending tasks detected within 3000ms. System is Idle.");
+      return null;
+    });
+
+  if (action) {
+    await action();
+  }
+
+  const isBusy = await busyPromise;
+  if (isBusy) {
+    debugLog("Pending task detected in top bar. Waiting for system to return to Idle...");
+
+    await page.waitForSelector(idleButtonSelector, {
+      visible: true,
+      timeout: disappearanceTimeout,
+    });
+
+    const duration = Date.now() - start;
+    debugLog(`Pending tasks finished. System became Idle after ${duration}ms`);
   }
 }
 

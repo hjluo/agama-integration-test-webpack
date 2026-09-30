@@ -17,6 +17,7 @@ export function performInstallation() {
 
     await overview.install();
     await confirmInstallation.confirmAndInstall();
+    console.log("===>Now perform installation, please wait baby ...");
   });
 }
 
