@@ -64,6 +64,12 @@ export class StorageSettingsPage {
   private readonly addDeviceMenuitem = () =>
     this.page.locator("::-p-aria(Add device menu[role='menuitem'])");
 
+  private readonly chooseLvmMenuitem = (title: string) =>
+    this.page.locator(`::-p-aria(${title})[role='menuitem']`);
+
+  public readonly lvmActionDropdownButton = () =>
+    this.page.locator("::-p-aria(All content will be deleted)[role='button']");
+
   constructor(page: Page) {
     this.page = page;
   }
@@ -158,5 +164,13 @@ export class StorageSettingsPage {
 
   async changeBootOptions() {
     await this.changeBootOptionsButton().click();
+  }
+
+  async openLvmDropdown() {
+    await this.lvmActionDropdownButton().click();
+  }
+
+  async selectRecreateLVMAction(lvmAction: string) {
+    await this.chooseLvmMenuitem(lvmAction).click();
   }
 }
