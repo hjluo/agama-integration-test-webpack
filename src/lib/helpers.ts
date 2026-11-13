@@ -27,6 +27,7 @@ const dir = "log";
  * @param message - The debug message to log
  */
 function debugLog(message: string): void {
+  console.log(`[Debug]: ${message}`);
   if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
     console.log(`[Debug]: ${message}`);
   }
@@ -251,6 +252,37 @@ export async function waitUntilOverlaySettled(
     debugLog(`Overlay cleared after ${duration}ms`);
   } else if (appeared && expectQuestionInterruption) {
     debugLog("Overlay expected and not waiting for it to disappear.");
+  }
+}
+
+export async function waitUntilSystemToIdle(
+  action: () => Promise<void>,
+  disappearanceTimeout = 2 * 60 * 1000
+) {
+  const idleSelector = "::-p-aria(Status: Idle)";
+  const busySelector = 'button[aria-label*="task active"], button.pf-m-in-progress';
+  const start = Date.now();
+
+  const busyPromise = page
+    .waitForSelector(busySelector, { visible: true, timeout: 10000 })
+    .catch(() => {
+      debugLog("System busy indicator did not appear within 10000ms after action. Moving on...");
+      return null;
+    });
+
+  await action();
+
+  const isBusy = await busyPromise;
+
+  if (isBusy) {
+    debugLog("Pending task detected in top bar. Waiting for system to settle...");
+    await page.waitForSelector(idleSelector, {
+      visible: true,
+      timeout: disappearanceTimeout,
+    });
+
+    const duration = Date.now() - start;
+    debugLog(`System reached stable state after ${duration}ms`);
   }
 }
 
