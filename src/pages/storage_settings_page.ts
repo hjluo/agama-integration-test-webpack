@@ -6,7 +6,8 @@ export class StorageSettingsPage {
   private readonly selectMoreDevicesButton = () =>
     this.page.locator("::-p-aria(More devices[role='button'])");
 
-  private readonly useDiskButton = () => this.page.locator("::-p-aria(Use disk[role='button'])");
+  private readonly useDiskButton = () =>
+    this.page.locator('::-p-aria([role="button"]) ::-p-text(Use disk)');
 
   private readonly settingsHeading = () => this.page.locator("::-p-aria(Settings[role='heading'])");
 
