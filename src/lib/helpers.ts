@@ -27,6 +27,7 @@ const dir = "log";
  * @param message - The debug message to log
  */
 function debugLog(message: string): void {
+  console.log(`[Debug]: ${message}`);
   if (process.env.DEBUG_AGAMA === "1" || process.env.DEBUG_AGAMA === "true") {
     console.log(`[Debug]: ${message}`);
   }
